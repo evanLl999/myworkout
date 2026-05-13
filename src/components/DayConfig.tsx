@@ -10,6 +10,7 @@ interface ExerciseFormData {
   default_weight: string;
   target_sets: string;
   target_reps: string;
+  sort_order: string;
   image_data: string | null;
   is_required: boolean;
 }
@@ -20,6 +21,7 @@ const EMPTY_FORM: ExerciseFormData = {
   default_weight: '0',
   target_sets: '4',
   target_reps: '12',
+  sort_order: '0',
   image_data: null,
   is_required: true,
 };
@@ -34,8 +36,6 @@ export default function DayConfig() {
   const [enlargedImage, setEnlargedImage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const formRef = useRef<HTMLDivElement>(null);
-  const [dragIdx, setDragIdx] = useState<number | null>(null);
-  const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   useEffect(() => {
     loadExercises(selectedDay);
@@ -49,8 +49,12 @@ export default function DayConfig() {
   }
 
   function handleAdd() {
+    // 自动计算下一个序号
+    const nextOrder = exercises.length > 0
+      ? Math.max(...exercises.map((e) => e.sort_order)) + 1
+      : 1;
     setEditingId(null);
-    setForm(EMPTY_FORM);
+    setForm({ ...EMPTY_FORM, sort_order: String(nextOrder) });
     setShowForm(true);
     setTimeout(() => formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
   }
@@ -63,6 +67,7 @@ export default function DayConfig() {
       default_weight: String(ex.default_weight),
       target_sets: String(ex.target_sets),
       target_reps: String(ex.target_reps),
+      sort_order: String(ex.sort_order),
       image_data: ex.image_data,
       is_required: !!ex.is_required,
     });
@@ -84,6 +89,7 @@ export default function DayConfig() {
       default_weight: parseFloat(form.default_weight) || 0,
       target_sets: parseInt(form.target_sets) || 1,
       target_reps: parseInt(form.target_reps) || 1,
+      sort_order: parseInt(form.sort_order) || 0,
       image_data: form.image_data,
       is_required: form.is_required,
     };
@@ -117,37 +123,6 @@ export default function DayConfig() {
     setShowForm(false);
   }
 
-  // 触屏拖动排序
-  function handleTouchStart(idx: number) {
-    setDragIdx(idx);
-  }
-
-  function handleTouchMove(e: React.TouchEvent) {
-    const touch = e.touches[0];
-    if (!touch) return;
-    const targetIdx = cardRefs.current.findIndex((ref) => {
-      if (!ref) return false;
-      const rect = ref.getBoundingClientRect();
-      return touch.clientY >= rect.top && touch.clientY <= rect.bottom;
-    });
-    if (targetIdx !== -1 && targetIdx !== dragIdx) {
-      const reordered = [...exercises];
-      const from = dragIdx!;
-      const [moved] = reordered.splice(from, 1);
-      reordered.splice(targetIdx, 0, moved);
-      setExercises(reordered);
-      setDragIdx(targetIdx);
-    }
-  }
-
-  async function handleTouchEnd() {
-    if (dragIdx === null) return;
-    setDragIdx(null);
-    const updates = exercises.map((ex, i) => api.updateExercise(ex.id, { sort_order: i }));
-    await Promise.all(updates);
-    await loadExercises(selectedDay);
-  }
-
   return (
     <div>
       <div className="tabs">
@@ -170,16 +145,8 @@ export default function DayConfig() {
         </div>
       ) : (
         <div>
-          {exercises.map((ex, idx) => (
-            <div
-              key={ex.id}
-              ref={(el) => { cardRefs.current[idx] = el; }}
-              className="exercise-card"
-              onTouchStart={() => handleTouchStart(idx)}
-              onTouchMove={handleTouchMove}
-              onTouchEnd={handleTouchEnd}
-              style={{ cursor: 'grab', transition: dragIdx !== null ? 'transform 0.15s' : undefined, opacity: dragIdx === idx ? 0.6 : 1 }}
-            >
+          {exercises.map((ex) => (
+            <div key={ex.id} className="exercise-card">
               <div style={{ display: 'flex', gap: 12 }}>
                 {ex.image_data && (
                   <div className="exercise-thumb" onClick={() => setEnlargedImage(ex.image_data)}>
@@ -199,6 +166,7 @@ export default function DayConfig() {
                   <div className="exercise-meta">
                     <span>{ex.target_sets} 组 × {ex.target_reps} 次</span>
                     <span>{ex.default_weight} kg</span>
+                    <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>排序 #{ex.sort_order}</span>
                   </div>
                   <div style={{ display: 'flex', gap: 8 }}>
                     <button type="button" className="btn btn-outline btn-sm" onClick={() => handleEdit(ex)}>编辑</button>
@@ -231,6 +199,13 @@ export default function DayConfig() {
                   onClick={() => setForm({ ...form, is_required: false })}
                 >选练</button>
               </div>
+            </div>
+            <div className="form-group">
+              <label className="form-label">排序（数字越小越靠前）</label>
+              <input className="form-input" type="text" inputMode="numeric"
+                value={form.sort_order}
+                onChange={(e) => setForm({ ...form, sort_order: e.target.value })}
+              />
             </div>
             <div className="form-group">
               <label className="form-label">肌肉群</label>
