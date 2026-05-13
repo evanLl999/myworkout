@@ -1,0 +1,485 @@
+:root {
+  --primary: #5B9BD5;
+  --primary-light: #D6E6F5;
+  --primary-dark: #3A7CC3;
+  --bg: #F5F8FC;
+  --white: #FFFFFF;
+  --text: #333333;
+  --text-secondary: #888888;
+  --success: #52C41A;
+  --border: #E0E6ED;
+  --sidebar-width: 180px;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+  color: var(--text);
+  background: var(--bg);
+}
+
+#root {
+  min-height: 100vh;
+}
+
+/* ========== Layout ========== */
+
+.app-layout {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+/* ========== Topbar ========== */
+
+.topbar {
+  height: 44px;
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+  background: var(--white);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.topbar-logo {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--primary-dark);
+  letter-spacing: 1px;
+}
+
+/* ========== Main Content ========== */
+
+.main-content {
+  flex: 1;
+  padding: 20px;
+  background: var(--bg);
+  overflow-y: auto;
+  padding-bottom: 80px; /* 给底部导航留空间 */
+}
+
+/* ========== Bottom Bar ========== */
+
+.bottom-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 56px;
+  background: var(--white);
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: center;
+  gap: 32px;
+  z-index: 100;
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
+.bottom-link {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 6px 20px;
+  text-decoration: none;
+  color: var(--text-secondary);
+  transition: color 0.2s;
+}
+
+.bottom-link.active {
+  color: var(--primary);
+}
+
+.bottom-icon {
+  font-size: 20px;
+}
+
+.bottom-label {
+  font-size: 11px;
+  font-weight: 500;
+}
+
+/* ========== Page ========== */
+
+.page {
+  max-width: 900px;
+}
+
+.page-title {
+  font-size: 22px;
+  font-weight: 600;
+  margin-bottom: 24px;
+  color: var(--text);
+}
+
+.page-placeholder {
+  color: var(--text-secondary);
+  font-size: 15px;
+  padding: 40px;
+  text-align: center;
+  background: var(--white);
+  border-radius: 12px;
+  border: 1px solid var(--border);
+}
+
+/* ========== Common Components ========== */
+
+.card {
+  background: var(--white);
+  border-radius: 12px;
+  padding: 20px;
+  border: 1px solid var(--border);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 20px;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+
+.btn-primary {
+  background: var(--primary);
+  color: var(--white);
+}
+
+.btn-primary:hover {
+  background: var(--primary-dark);
+}
+
+.btn-outline {
+  background: var(--white);
+  color: var(--primary);
+  border: 1px solid var(--primary);
+}
+
+.btn-outline:hover {
+  background: var(--primary-light);
+}
+
+.btn-sm {
+  padding: 4px 12px;
+  font-size: 13px;
+}
+
+.btn-danger {
+  background: #e74c3c;
+  color: var(--white);
+}
+
+.btn-danger:hover {
+  background: #c0392b;
+}
+
+/* ========== Form ========== */
+
+.form-group {
+  margin-bottom: 16px;
+}
+
+.form-label {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 6px;
+  color: var(--text);
+}
+
+.form-input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: inherit;
+  color: var(--text);
+  background: var(--white);
+  transition: border-color 0.2s;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-light);
+}
+
+select.form-input {
+  cursor: pointer;
+}
+
+/* ========== Tabs ========== */
+
+.tabs {
+  display: flex;
+  gap: 4px;
+  background: var(--white);
+  border-radius: 10px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  margin-bottom: 24px;
+}
+
+.tab {
+  flex: 1;
+  padding: 8px 0;
+  text-align: center;
+  border: none;
+  background: transparent;
+  border-radius: 7px;
+  font-size: 14px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  transition: all 0.2s;
+  font-family: inherit;
+}
+
+.tab:hover {
+  color: var(--text);
+}
+
+.tab.active {
+  background: var(--primary);
+  color: var(--white);
+  font-weight: 600;
+}
+
+/* ========== Day Cards ========== */
+
+.day-cards {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+
+.day-card {
+  flex: 1;
+  padding: 12px 8px;
+  text-align: center;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--white);
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.day-card:hover {
+  border-color: var(--primary);
+}
+
+.day-card.active {
+  background: var(--primary);
+  color: var(--white);
+  border-color: var(--primary);
+  font-weight: 600;
+}
+
+.day-card.today {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px var(--primary-light);
+}
+
+.day-card .day-name {
+  font-size: 12px;
+  opacity: 0.8;
+  margin-bottom: 4px;
+}
+
+.day-card .day-date {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.day-card .day-label {
+  font-size: 10px;
+  opacity: 0.7;
+  margin-top: 2px;
+}
+
+/* ========== Exercise Card ========== */
+
+.exercise-card {
+  background: var(--white);
+  border-radius: 12px;
+  padding: 16px 20px;
+  border: 1px solid var(--border);
+  margin-bottom: 12px;
+}
+
+.exercise-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.exercise-name {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.exercise-muscle {
+  font-size: 13px;
+  color: var(--primary);
+  background: var(--primary-light);
+  padding: 2px 10px;
+  border-radius: 12px;
+}
+
+.exercise-meta {
+  display: flex;
+  gap: 20px;
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+}
+
+.exercise-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* ========== Rest Timer ========== */
+
+.rest-timer {
+  font-size: 14px;
+  color: var(--primary);
+  font-weight: 500;
+  padding: 4px 12px;
+  background: var(--primary-light);
+  border-radius: 8px;
+  display: inline-block;
+}
+
+/* ========== Empty State ========== */
+
+.empty-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+  opacity: 0.4;
+}
+
+.empty-state-text {
+  font-family: 'STKaiti', 'KaiTi', '楷体', serif;
+  font-size: 48px;
+  color: var(--text-secondary);
+  letter-spacing: 8px;
+  text-shadow: 2px 2px 8px rgba(91, 155, 213, 0.15);
+  user-select: none;
+}
+
+.empty-state-text.future {
+  font-family: 'STLiti', 'LiSu', '隶书', 'STKaiti', serif;
+  font-size: 52px;
+  color: var(--primary);
+  text-shadow: 2px 2px 12px rgba(91, 155, 213, 0.25);
+}
+
+/* ========== Exercise Thumbnail ========== */
+
+.exercise-thumb {
+  flex-shrink: 0;
+  width: 80px;
+  height: 80px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.exercise-thumb:hover {
+  transform: scale(1.05);
+}
+
+.exercise-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* ========== Image Overlay (Enlarge) ========== */
+
+.image-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  cursor: pointer;
+}
+
+.image-overlay img {
+  max-width: 80vw;
+  max-height: 80vh;
+  border-radius: 12px;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.3);
+  cursor: default;
+}
+
+/* ========== Shake Animation ========== */
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  10% { transform: translateX(-6px) rotate(-0.5deg); }
+  20% { transform: translateX(6px) rotate(0.5deg); }
+  30% { transform: translateX(-5px) rotate(-0.3deg); }
+  40% { transform: translateX(5px) rotate(0.3deg); }
+  50% { transform: translateX(-3px); }
+  60% { transform: translateX(3px); }
+  70% { transform: translateX(-1px); }
+  80% { transform: translateX(1px); }
+}
+
+.shake-it {
+  animation: shake 0.5s ease-out;
+}
+
+/* ========== Spark Particles ========== */
+
+@keyframes spark-fly {
+  0% {
+    transform: translate(0, 0) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(var(--sx), var(--sy)) scale(0);
+    opacity: 0;
+  }
+}
+
+.spark-container {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+}
+
+.spark-particle {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  animation: spark-fly 0.8s ease-out forwards;
+  box-shadow: 0 0 6px 2px currentColor;
+}
