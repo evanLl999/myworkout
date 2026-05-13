@@ -147,7 +147,7 @@ export default function DayConfig() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <span className="exercise-name">{ex.exercise_name}</span>
                       <span className={`tag ${ex.is_required ? 'tag-required' : 'tag-optional'}`}>
-                        {ex.is_required ? '必练' : '选练'}
+                        {ex.is_required ? '必练 *' : '选练'}
                       </span>
                     </div>
                     <span className="exercise-muscle">{ex.muscle_group}</span>

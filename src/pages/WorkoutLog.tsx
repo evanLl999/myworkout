@@ -56,6 +56,7 @@ export default function WorkoutLog() {
   const isFutureDate = selectedDate > today;
   const isPastEmpty = selectedDate < today && setLogs.length === 0 && !loading;
   const isFutureEmpty = isFutureDate && !loading;
+  const isTodayEmpty = isToday && exercises.length === 0 && !loading;
 
   const hasTrainingStarted = !!session?.training_started_at;
   const hasTrainingEnded = !!session?.training_ended_at;
@@ -67,15 +68,17 @@ export default function WorkoutLog() {
     return completed >= ex.target_sets;
   });
 
-  // 最后一组打卡的时间（用于计算计划用时和休息计时）
+  // 最后一组打卡的时间
   const lastSetTime = setLogs.length > 0
     ? setLogs.reduce((latest, log) =>
         log.completed_at > latest ? log.completed_at : latest, setLogs[0].completed_at)
     : null;
 
-  // 休息计时逻辑
+  // 休息计时：开始训练就有（用训练开始时间或最后打卡时间）
   const showRestTimer = hasTrainingStarted && !allCompleted && !hasTrainingEnded;
-  const lastCheckInTime = showRestTimer ? lastSetTime : null;
+  const lastCheckInTime = showRestTimer
+    ? (lastSetTime || session?.training_started_at || null)
+    : null;
 
   const loadDay = useCallback(async (date: string) => {
     setLoading(true);
@@ -201,12 +204,12 @@ export default function WorkoutLog() {
       {/* 过去未训练 — 空状态 */}
       {isPastEmpty && (
         <div className="empty-state">
-          <span className="empty-state-text">没有训练</span>
+          <span className="empty-state-text">没有训练吗？</span>
         </div>
       )}
 
-      {/* 未来日期 — 空状态 */}
-      {isFutureEmpty && (
+      {/* 未来日期 / 今天无计划 — 空状态 */}
+      {(isFutureEmpty || isTodayEmpty) && (
         <div className="empty-state">
           <span className="empty-state-text future">等待你变强</span>
         </div>
@@ -267,8 +270,8 @@ export default function WorkoutLog() {
           <button
             onClick={handleReset}
             style={{
-              marginLeft: 'auto', background: 'var(--white)', border: '1px solid var(--border)',
-              color: 'var(--text-secondary)', cursor: 'pointer',
+              marginLeft: 'auto', background: 'var(--white)', border: '1px solid #e74c3c',
+              color: '#e74c3c', cursor: 'pointer',
               fontSize: 11, padding: '2px 8px', borderRadius: 4, fontFamily: 'inherit',
             }}
           >重置</button>
@@ -276,11 +279,13 @@ export default function WorkoutLog() {
       )}
 
       {/* 正常训练内容（非空状态时显示） */}
-      {!(isPastEmpty || isFutureEmpty) && (
+      {!(isPastEmpty || isFutureEmpty || isTodayEmpty) && (
         <>
-          <div style={{ marginBottom: 16 }}>
-            <RestTimer lastCheckInTime={lastCheckInTime} isComplete={allCompleted || hasTrainingEnded} />
-          </div>
+          {hasTrainingStarted && (
+            <div style={{ marginBottom: 16 }}>
+              <RestTimer lastCheckInTime={lastCheckInTime} isComplete={allCompleted || hasTrainingEnded} />
+            </div>
+          )}
 
           {loading ? (
             <p style={{ color: 'var(--text-secondary)', textAlign: 'center', padding: 40 }}>加载中...</p>

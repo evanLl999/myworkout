@@ -24,7 +24,7 @@ export default function RestTimer({ lastCheckInTime, isComplete }: Props) {
   if (isComplete) {
     return <span className="rest-timer" style={{ background: 'var(--success)', color: '#fff' }}>训练完成 ✓</span>;
   }
-  if (!lastCheckInTime) return <span className="rest-timer">准备开始</span>;
+  if (!lastCheckInTime) return null;
 
   const elapsed = Math.floor((Date.now() - new Date(lastCheckInTime).getTime()) / 1000);
   return <span className="rest-timer">休息: {formatRest(elapsed)}</span>;

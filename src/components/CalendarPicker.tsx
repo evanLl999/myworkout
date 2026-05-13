@@ -65,7 +65,7 @@ export default function CalendarPicker({ selectedDate, onSelect, onClose }: Prop
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
           <button className="btn btn-outline btn-sm" onClick={prevMonth}>←</button>
           <span style={{ fontWeight: 600 }}>
-            {viewYear}年{viewMonth + 1}月
+            {viewMonth + 1}月
           </span>
           <button className="btn btn-outline btn-sm" onClick={nextMonth}>→</button>
         </div>
@@ -83,12 +83,12 @@ export default function CalendarPicker({ selectedDate, onSelect, onClose }: Prop
                 key={d}
                 onClick={() => selectDay(d)}
                 style={{
-                  padding: '6px 0', border: 'none', borderRadius: 6, cursor: 'pointer',
+                  padding: '6px 0', border: 'none', borderRadius: 8, cursor: 'pointer',
                   fontFamily: 'inherit', fontSize: 14,
-                  background: isSelected ? 'var(--primary)' : 'transparent',
-                  color: isSelected ? '#fff' : isToday ? 'var(--primary)' : 'var(--text)',
-                  fontWeight: isSelected || isToday ? 600 : 400,
-                  outline: isToday && !isSelected ? '1px solid var(--primary)' : undefined,
+                  background: isSelected ? 'var(--primary-dark)' : isToday ? 'var(--primary-light)' : 'transparent',
+                  color: isSelected ? '#fff' : isToday ? 'var(--primary-dark)' : 'var(--text)',
+                  fontWeight: isSelected || isToday ? 700 : 400,
+                  boxShadow: isSelected ? '0 2px 8px rgba(58,124,195,0.4)' : undefined,
                 }}
               >
                 {d}
