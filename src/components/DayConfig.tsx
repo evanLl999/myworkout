@@ -33,6 +33,9 @@ export default function DayConfig() {
   const [form, setForm] = useState<ExerciseFormData>(EMPTY_FORM);
   const [enlargedImage, setEnlargedImage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const formRef = useRef<HTMLDivElement>(null);
+  const dragItem = useRef<number | null>(null);
+  const dragOverItem = useRef<number | null>(null);
 
   useEffect(() => {
     loadExercises(selectedDay);
@@ -49,6 +52,7 @@ export default function DayConfig() {
     setEditingId(null);
     setForm(EMPTY_FORM);
     setShowForm(true);
+    setTimeout(() => formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
   }
 
   function handleEdit(ex: ExerciseConfig) {
@@ -63,6 +67,7 @@ export default function DayConfig() {
       is_required: !!ex.is_required,
     });
     setShowForm(true);
+    setTimeout(() => formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
   }
 
   async function handleDelete(id: number) {
@@ -112,6 +117,32 @@ export default function DayConfig() {
     setShowForm(false);
   }
 
+  // 拖动排序
+  function handleDragStart(idx: number) {
+    dragItem.current = idx;
+  }
+
+  function handleDragEnter(idx: number) {
+    dragOverItem.current = idx;
+  }
+
+  async function handleDragEnd() {
+    const from = dragItem.current;
+    const to = dragOverItem.current;
+    if (from === null || to === null || from === to) return;
+    dragItem.current = null;
+    dragOverItem.current = null;
+
+    const reordered = [...exercises];
+    const [moved] = reordered.splice(from, 1);
+    reordered.splice(to, 0, moved);
+
+    // 更新 sort_order
+    const updates = reordered.map((ex, i) => api.updateExercise(ex.id, { sort_order: i }));
+    await Promise.all(updates);
+    await loadExercises(selectedDay);
+  }
+
   return (
     <div>
       <div className="tabs">
@@ -134,8 +165,17 @@ export default function DayConfig() {
         </div>
       ) : (
         <div>
-          {exercises.map((ex) => (
-            <div key={ex.id} className="exercise-card">
+          {exercises.map((ex, idx) => (
+            <div
+              key={ex.id}
+              className="exercise-card"
+              draggable
+              onDragStart={() => handleDragStart(idx)}
+              onDragEnter={() => handleDragEnter(idx)}
+              onDragEnd={handleDragEnd}
+              onDragOver={(e) => e.preventDefault()}
+              style={{ cursor: 'grab' }}
+            >
               <div style={{ display: 'flex', gap: 12 }}>
                 {ex.image_data && (
                   <div className="exercise-thumb" onClick={() => setEnlargedImage(ex.image_data)}>
@@ -157,8 +197,8 @@ export default function DayConfig() {
                     <span>{ex.default_weight} kg</span>
                   </div>
                   <div style={{ display: 'flex', gap: 8 }}>
-                    <button className="btn btn-outline btn-sm" onClick={() => handleEdit(ex)}>编辑</button>
-                    <button className="btn btn-danger btn-sm" onClick={() => handleDelete(ex.id)}>删除</button>
+                    <button type="button" className="btn btn-outline btn-sm" onClick={() => handleEdit(ex)}>编辑</button>
+                    <button type="button" className="btn btn-danger btn-sm" onClick={() => handleDelete(ex.id)}>删除</button>
                   </div>
                 </div>
               </div>
@@ -168,12 +208,11 @@ export default function DayConfig() {
       )}
 
       {showForm && (
-        <div className="card" style={{ marginTop: 16 }}>
+        <div ref={formRef} className="card" style={{ marginTop: 16 }}>
           <h3 style={{ marginBottom: 16, fontSize: 16 }}>
             {editingId ? '编辑动作' : '添加动作'}
           </h3>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 14 }}>
-            {/* 必练/选练 */}
             <div className="form-group">
               <label className="form-label">训练类型</label>
               <div style={{ display: 'flex', gap: 8 }}>
@@ -189,7 +228,6 @@ export default function DayConfig() {
                 >选练</button>
               </div>
             </div>
-
             <div className="form-group">
               <label className="form-label">肌肉群</label>
               <input className="form-input" placeholder="例如：胸、背、腿"
@@ -232,7 +270,7 @@ export default function DayConfig() {
                   <img src={form.image_data} alt="预览"
                     style={{ width: 100, height: 100, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--border)' }}
                   />
-                  <button onClick={handleRemoveImage}
+                  <button type="button" onClick={handleRemoveImage}
                     style={{
                       position: 'absolute', top: -8, right: -8,
                       width: 22, height: 22, borderRadius: '50%',
@@ -251,17 +289,17 @@ export default function DayConfig() {
             </div>
           </div>
           <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
-            <button className="btn btn-primary" onClick={handleSave}>
+            <button type="button" className="btn btn-primary" onClick={handleSave}>
               {editingId ? '保存修改' : '添加'}
             </button>
-            <button className="btn btn-outline" onClick={() => setShowForm(false)}>取消</button>
+            <button type="button" className="btn btn-outline" onClick={() => setShowForm(false)}>取消</button>
           </div>
         </div>
       )}
 
       {!showForm && (
         <div style={{ marginTop: 16 }}>
-          <button className="btn btn-primary" onClick={handleAdd}>+ 添加动作</button>
+          <button type="button" className="btn btn-primary" onClick={handleAdd}>+ 添加动作</button>
         </div>
       )}
 
