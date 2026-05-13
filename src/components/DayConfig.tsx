@@ -173,13 +173,12 @@ export default function DayConfig() {
           {exercises.map((ex, idx) => (
             <div
               key={ex.id}
+              ref={(el) => { cardRefs.current[idx] = el; }}
               className="exercise-card"
-              draggable
-              onDragStart={() => handleDragStart(idx)}
-              onDragEnter={() => handleDragEnter(idx)}
-              onDragEnd={handleDragEnd}
-              onDragOver={(e) => e.preventDefault()}
-              style={{ cursor: 'grab' }}
+              onTouchStart={() => handleTouchStart(idx)}
+              onTouchMove={handleTouchMove}
+              onTouchEnd={handleTouchEnd}
+              style={{ cursor: 'grab', transition: dragIdx !== null ? 'transform 0.15s' : undefined, opacity: dragIdx === idx ? 0.6 : 1 }}
             >
               <div style={{ display: 'flex', gap: 12 }}>
                 {ex.image_data && (
