@@ -21,6 +21,9 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif;
   color: var(--text);
   background: var(--bg);
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 #root {
@@ -38,19 +41,28 @@ body {
 /* ========== Topbar ========== */
 
 .topbar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
   height: 44px;
   display: flex;
   align-items: center;
+  gap: 8px;
   padding: 0 20px;
   background: var(--white);
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
 
+.topbar-icon {
+  font-size: 22px;
+  line-height: 1;
+}
+
 .topbar-logo {
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--primary-dark);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
   letter-spacing: 1px;
 }
 
@@ -71,14 +83,13 @@ body {
   bottom: 0;
   left: 0;
   right: 0;
-  height: 60px;
   background: var(--white);
   border-top: 1px solid var(--border);
   display: flex;
   justify-content: space-around;
-  align-items: center;
+  align-items: flex-start;
   z-index: 100;
-  padding-bottom: env(safe-area-inset-bottom, 0);
+  padding: 8px 0 calc(8px + env(safe-area-inset-bottom, 0));
 }
 
 .bottom-link {
@@ -91,7 +102,6 @@ body {
   text-decoration: none;
   color: var(--text-secondary);
   transition: color 0.2s;
-  height: 100%;
 }
 
 .bottom-link.active {
