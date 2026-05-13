@@ -34,8 +34,8 @@ export default function DayConfig() {
   const [enlargedImage, setEnlargedImage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const formRef = useRef<HTMLDivElement>(null);
-  const dragItem = useRef<number | null>(null);
-  const dragOverItem = useRef<number | null>(null);
+  const [dragIdx, setDragIdx] = useState<number | null>(null);
+  const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   useEffect(() => {
     loadExercises(selectedDay);
@@ -117,28 +117,33 @@ export default function DayConfig() {
     setShowForm(false);
   }
 
-  // 拖动排序
-  function handleDragStart(idx: number) {
-    dragItem.current = idx;
+  // 触屏拖动排序
+  function handleTouchStart(idx: number) {
+    setDragIdx(idx);
   }
 
-  function handleDragEnter(idx: number) {
-    dragOverItem.current = idx;
+  function handleTouchMove(e: React.TouchEvent) {
+    const touch = e.touches[0];
+    if (!touch) return;
+    const targetIdx = cardRefs.current.findIndex((ref) => {
+      if (!ref) return false;
+      const rect = ref.getBoundingClientRect();
+      return touch.clientY >= rect.top && touch.clientY <= rect.bottom;
+    });
+    if (targetIdx !== -1 && targetIdx !== dragIdx) {
+      const reordered = [...exercises];
+      const from = dragIdx!;
+      const [moved] = reordered.splice(from, 1);
+      reordered.splice(targetIdx, 0, moved);
+      setExercises(reordered);
+      setDragIdx(targetIdx);
+    }
   }
 
-  async function handleDragEnd() {
-    const from = dragItem.current;
-    const to = dragOverItem.current;
-    if (from === null || to === null || from === to) return;
-    dragItem.current = null;
-    dragOverItem.current = null;
-
-    const reordered = [...exercises];
-    const [moved] = reordered.splice(from, 1);
-    reordered.splice(to, 0, moved);
-
-    // 更新 sort_order
-    const updates = reordered.map((ex, i) => api.updateExercise(ex.id, { sort_order: i }));
+  async function handleTouchEnd() {
+    if (dragIdx === null) return;
+    setDragIdx(null);
+    const updates = exercises.map((ex, i) => api.updateExercise(ex.id, { sort_order: i }));
     await Promise.all(updates);
     await loadExercises(selectedDay);
   }
