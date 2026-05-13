@@ -14,7 +14,6 @@ const lighten = (amt: number) => `rgb(${Math.min(255, r + amt)},${Math.min(255, 
 document.documentElement.style.setProperty('--primary', saved);
 document.documentElement.style.setProperty('--primary-dark', darken(40));
 document.documentElement.style.setProperty('--primary-light', lighten(90));
-document.documentElement.style.setProperty('--bg', lighten(115));
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

@@ -45,7 +45,6 @@ export default function ColorPickerBtn() {
     root.style.setProperty('--primary', c);
     root.style.setProperty('--primary-dark', darken(40));
     root.style.setProperty('--primary-light', lighten(90));
-    root.style.setProperty('--bg', lighten(115));
   }
 
   function handleChange(c: string) {
