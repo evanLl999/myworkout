@@ -157,7 +157,7 @@ export default function DayConfig() {
           <h3 style={{ marginBottom: 16, fontSize: 16 }}>
             {editingId ? '编辑动作' : '添加动作'}
           </h3>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 14 }}>
             <div className="form-group">
               <label className="form-label">肌肉群</label>
               <input className="form-input" placeholder="例如：胸、背、腿"
@@ -194,7 +194,7 @@ export default function DayConfig() {
               />
             </div>
             <div className="form-group">
-              <label className="form-label">动作图片</label>
+              <label className="form-label">参考图片</label>
               {form.image_data ? (
                 <div style={{ position: 'relative', display: 'inline-block' }}>
                   <img src={form.image_data} alt="预览"

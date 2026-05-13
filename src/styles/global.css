@@ -61,7 +61,7 @@ body {
   padding: 20px;
   background: var(--bg);
   overflow-y: auto;
-  padding-bottom: 80px; /* 给底部导航留空间 */
+  padding-bottom: 90px; /* 给底部导航留空间 */
 }
 
 /* ========== Bottom Bar ========== */
@@ -71,12 +71,12 @@ body {
   bottom: 0;
   left: 0;
   right: 0;
-  height: 56px;
+  height: 60px;
   background: var(--white);
   border-top: 1px solid var(--border);
   display: flex;
-  justify-content: center;
-  gap: 32px;
+  justify-content: space-around;
+  align-items: center;
   z-index: 100;
   padding-bottom: env(safe-area-inset-bottom, 0);
 }
@@ -87,10 +87,11 @@ body {
   align-items: center;
   justify-content: center;
   gap: 2px;
-  padding: 6px 20px;
+  flex: 1;
   text-decoration: none;
   color: var(--text-secondary);
   transition: color 0.2s;
+  height: 100%;
 }
 
 .bottom-link.active {
@@ -99,11 +100,13 @@ body {
 
 .bottom-icon {
   font-size: 20px;
+  line-height: 1;
 }
 
 .bottom-label {
   font-size: 11px;
   font-weight: 500;
+  line-height: 1;
 }
 
 /* ========== Page ========== */
