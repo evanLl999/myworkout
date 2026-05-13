@@ -1,4 +1,5 @@
 import { NavLink, Outlet } from 'react-router-dom';
+import ColorPickerBtn from './ColorPicker';
 
 const menuItems = [
   { path: '/workout', label: '训练记录', icon: '📋' },
@@ -11,6 +12,9 @@ export default function Layout() {
       <header className="topbar">
         <span className="topbar-icon">🏋️</span>
         <span className="topbar-logo">记录每一次变强</span>
+        <div style={{ marginLeft: 'auto' }}>
+          <ColorPickerBtn />
+        </div>
       </header>
       <main className="main-content">
         <Outlet />

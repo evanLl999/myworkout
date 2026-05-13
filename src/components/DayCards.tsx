@@ -25,7 +25,7 @@ export default function DayCards({ weekStart, selectedDate, onSelect }: Props) {
       date: formatDate(d),
       name: DAY_NAMES[i],
       dayNum: d.getDate(),
-      dateLabel: `${d.getDate()}-${MONTH_ABBRS[d.getMonth()]}`,
+      dateLabel: `${d.getDate()} ${MONTH_ABBRS[d.getMonth()]}`,
     });
   }
 
