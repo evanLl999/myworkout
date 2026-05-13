@@ -9,6 +9,7 @@ export interface ExerciseConfig {
   target_reps: number;
   sort_order: number;
   image_data: string | null;
+  is_required: number;
   created_at: string;
   updated_at: string;
 }

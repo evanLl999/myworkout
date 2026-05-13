@@ -60,8 +60,9 @@ export default function WorkoutLog() {
   const hasTrainingStarted = !!session?.training_started_at;
   const hasTrainingEnded = !!session?.training_ended_at;
 
-  // 今天所有动作的所有组是否都已完成
-  const allCompleted = isToday && exercises.length > 0 && exercises.every((ex) => {
+  // 只有必练动作完成才算计划完成
+  const requiredExercises = exercises.filter((ex) => ex.is_required);
+  const allCompleted = isToday && requiredExercises.length > 0 && requiredExercises.every((ex) => {
     const completed = setLogs.filter((sl) => sl.exercise_config_id === ex.id).length;
     return completed >= ex.target_sets;
   });
@@ -103,10 +104,12 @@ export default function WorkoutLog() {
     loadDay(selectedDate);
   }, [selectedDate, loadDay]);
 
-  // 计划完成时自动标记 session 完成
+  // 必练动作完成时自动标记 session 完成
   useEffect(() => {
     if (!session || exercises.length === 0) return;
-    const allDone = exercises.every((ex) => {
+    const required = exercises.filter((ex) => ex.is_required);
+    if (required.length === 0) return;
+    const allDone = required.every((ex) => {
       const completed = setLogs.filter((sl) => sl.exercise_config_id === ex.id).length;
       return completed >= ex.target_sets;
     });

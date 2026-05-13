@@ -344,6 +344,26 @@ select.form-input {
   border-radius: 12px;
 }
 
+/* ========== Tags ========== */
+
+.tag {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.tag-required {
+  background: #FFE0E0;
+  color: #D32F2F;
+}
+
+.tag-optional {
+  background: #E8F5E9;
+  color: #388E3C;
+}
+
 .exercise-meta {
   display: flex;
   gap: 20px;

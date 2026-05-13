@@ -107,8 +107,11 @@ export default function ExerciseTracker({
                 )}
                 <div style={{ flex: 1 }}>
                   <div className="exercise-header">
-                    <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <span className="exercise-name">{ex.exercise_name}</span>
+                      <span className={`tag ${ex.is_required ? 'tag-required' : 'tag-optional'}`}>
+                        {ex.is_required ? '必练' : '选练'}
+                      </span>
                       {allDone && (
                         <span style={{ marginLeft: 8, color: 'var(--success)', fontSize: 13, fontWeight: 600 }}>
                           ✓ 完成

@@ -39,6 +39,7 @@ async function initDatabase() {
       target_reps INTEGER NOT NULL DEFAULT 1,
       sort_order INTEGER NOT NULL DEFAULT 0,
       image_data TEXT DEFAULT NULL,
+      is_required INTEGER NOT NULL DEFAULT 1,
       created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
       updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
     )
@@ -46,6 +47,7 @@ async function initDatabase() {
 
   // 迁移：为已有数据库添加新字段
   try { db.run("ALTER TABLE exercise_configs ADD COLUMN image_data TEXT"); } catch (_) {}
+  try { db.run("ALTER TABLE exercise_configs ADD COLUMN is_required INTEGER NOT NULL DEFAULT 1"); } catch (_) {}
 
   db.run(`
     CREATE TABLE IF NOT EXISTS workout_sessions (
@@ -147,20 +149,20 @@ function getAllConfigs() {
   return queryAll('SELECT * FROM exercise_configs ORDER BY day_of_week, sort_order');
 }
 
-function addExercise({ day_of_week, muscle_group, exercise_name, default_weight, target_sets, target_reps, image_data }) {
+function addExercise({ day_of_week, muscle_group, exercise_name, default_weight, target_sets, target_reps, image_data, is_required }) {
   const row = queryOne('SELECT COALESCE(MAX(sort_order), -1) + 1 AS next FROM exercise_configs WHERE day_of_week = ?', [day_of_week]);
   const sortOrder = row ? row.next : 0;
 
   const result = run(
-    `INSERT INTO exercise_configs (day_of_week, muscle_group, exercise_name, default_weight, target_sets, target_reps, sort_order, image_data)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    [day_of_week, muscle_group, exercise_name, default_weight, target_sets, target_reps, sortOrder, image_data ?? null]
+    `INSERT INTO exercise_configs (day_of_week, muscle_group, exercise_name, default_weight, target_sets, target_reps, sort_order, image_data, is_required)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [day_of_week, muscle_group, exercise_name, default_weight, target_sets, target_reps, sortOrder, image_data ?? null, is_required ? 1 : 0]
   );
   return result.lastInsertRowid;
 }
 
 function updateExercise(id, fields) {
-  const allowed = ['muscle_group', 'exercise_name', 'default_weight', 'target_sets', 'target_reps', 'sort_order', 'image_data'];
+  const allowed = ['muscle_group', 'exercise_name', 'default_weight', 'target_sets', 'target_reps', 'sort_order', 'image_data', 'is_required'];
   const sets = [];
   const values = [];
 

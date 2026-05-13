@@ -7,19 +7,21 @@ const DAY_NAMES = ['周一', '周二', '周三', '周四', '周五', '周六', '
 interface ExerciseFormData {
   muscle_group: string;
   exercise_name: string;
-  default_weight: number;
-  target_sets: number;
-  target_reps: number;
+  default_weight: string;
+  target_sets: string;
+  target_reps: string;
   image_data: string | null;
+  is_required: boolean;
 }
 
 const EMPTY_FORM: ExerciseFormData = {
   muscle_group: '',
   exercise_name: '',
-  default_weight: 0,
-  target_sets: 4,
-  target_reps: 12,
+  default_weight: '0',
+  target_sets: '4',
+  target_reps: '12',
   image_data: null,
+  is_required: true,
 };
 
 export default function DayConfig() {
@@ -54,10 +56,11 @@ export default function DayConfig() {
     setForm({
       muscle_group: ex.muscle_group,
       exercise_name: ex.exercise_name,
-      default_weight: ex.default_weight,
-      target_sets: ex.target_sets,
-      target_reps: ex.target_reps,
+      default_weight: String(ex.default_weight),
+      target_sets: String(ex.target_sets),
+      target_reps: String(ex.target_reps),
       image_data: ex.image_data,
+      is_required: !!ex.is_required,
     });
     setShowForm(true);
   }
@@ -70,10 +73,20 @@ export default function DayConfig() {
   async function handleSave() {
     if (!form.muscle_group.trim() || !form.exercise_name.trim()) return;
 
+    const data = {
+      muscle_group: form.muscle_group.trim(),
+      exercise_name: form.exercise_name.trim(),
+      default_weight: parseFloat(form.default_weight) || 0,
+      target_sets: parseInt(form.target_sets) || 1,
+      target_reps: parseInt(form.target_reps) || 1,
+      image_data: form.image_data,
+      is_required: form.is_required,
+    };
+
     if (editingId) {
-      await api.updateExercise(editingId, form);
+      await api.updateExercise(editingId, data);
     } else {
-      await api.addExercise({ ...form, day_of_week: selectedDay });
+      await api.addExercise({ ...data, day_of_week: selectedDay });
     }
     setShowForm(false);
     await loadExercises(selectedDay);
@@ -123,18 +136,20 @@ export default function DayConfig() {
         <div>
           {exercises.map((ex) => (
             <div key={ex.id} className="exercise-card">
-              <div style={{ display: 'flex', gap: 16 }}>
+              <div style={{ display: 'flex', gap: 12 }}>
                 {ex.image_data && (
-                  <div
-                    className="exercise-thumb"
-                    onClick={() => setEnlargedImage(ex.image_data)}
-                  >
+                  <div className="exercise-thumb" onClick={() => setEnlargedImage(ex.image_data)}>
                     <img src={ex.image_data} alt={ex.exercise_name} />
                   </div>
                 )}
                 <div style={{ flex: 1 }}>
                   <div className="exercise-header">
-                    <span className="exercise-name">{ex.exercise_name}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span className="exercise-name">{ex.exercise_name}</span>
+                      <span className={`tag ${ex.is_required ? 'tag-required' : 'tag-optional'}`}>
+                        {ex.is_required ? '必练' : '选练'}
+                      </span>
+                    </div>
                     <span className="exercise-muscle">{ex.muscle_group}</span>
                   </div>
                   <div className="exercise-meta">
@@ -158,6 +173,23 @@ export default function DayConfig() {
             {editingId ? '编辑动作' : '添加动作'}
           </h3>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 14 }}>
+            {/* 必练/选练 */}
+            <div className="form-group">
+              <label className="form-label">训练类型</label>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  type="button"
+                  className={`btn btn-sm ${form.is_required ? 'btn-primary' : 'btn-outline'}`}
+                  onClick={() => setForm({ ...form, is_required: true })}
+                >必练</button>
+                <button
+                  type="button"
+                  className={`btn btn-sm ${!form.is_required ? 'btn-primary' : 'btn-outline'}`}
+                  onClick={() => setForm({ ...form, is_required: false })}
+                >选练</button>
+              </div>
+            </div>
+
             <div className="form-group">
               <label className="form-label">肌肉群</label>
               <input className="form-input" placeholder="例如：胸、背、腿"
@@ -174,23 +206,23 @@ export default function DayConfig() {
             </div>
             <div className="form-group">
               <label className="form-label">配重 (kg)</label>
-              <input className="form-input" type="number" min={0} step={0.5}
+              <input className="form-input" type="text" inputMode="decimal"
                 value={form.default_weight}
-                onChange={(e) => setForm({ ...form, default_weight: parseFloat(e.target.value) || 0 })}
+                onChange={(e) => setForm({ ...form, default_weight: e.target.value })}
               />
             </div>
             <div className="form-group">
               <label className="form-label">组数</label>
-              <input className="form-input" type="number" min={1}
+              <input className="form-input" type="text" inputMode="numeric"
                 value={form.target_sets}
-                onChange={(e) => setForm({ ...form, target_sets: parseInt(e.target.value) || 1 })}
+                onChange={(e) => setForm({ ...form, target_sets: e.target.value })}
               />
             </div>
             <div className="form-group">
               <label className="form-label">每组次数</label>
-              <input className="form-input" type="number" min={1}
+              <input className="form-input" type="text" inputMode="numeric"
                 value={form.target_reps}
-                onChange={(e) => setForm({ ...form, target_reps: parseInt(e.target.value) || 1 })}
+                onChange={(e) => setForm({ ...form, target_reps: e.target.value })}
               />
             </div>
             <div className="form-group">
@@ -200,22 +232,19 @@ export default function DayConfig() {
                   <img src={form.image_data} alt="预览"
                     style={{ width: 100, height: 100, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--border)' }}
                   />
-                  <button
-                    onClick={handleRemoveImage}
+                  <button onClick={handleRemoveImage}
                     style={{
                       position: 'absolute', top: -8, right: -8,
                       width: 22, height: 22, borderRadius: '50%',
                       border: '1px solid var(--border)', background: '#fff',
-                      cursor: 'pointer', fontSize: 12, lineHeight: '20px',
-                      color: '#e74c3c',
+                      cursor: 'pointer', fontSize: 12, lineHeight: '20px', color: '#e74c3c',
                     }}
                   >✕</button>
                 </div>
               ) : (
                 <div>
                   <input ref={fileInputRef} type="file" accept="image/*"
-                    onChange={handleImagePick}
-                    style={{ fontSize: 13 }}
+                    onChange={handleImagePick} style={{ fontSize: 13 }}
                   />
                 </div>
               )}
@@ -236,12 +265,9 @@ export default function DayConfig() {
         </div>
       )}
 
-      {/* 图片放大弹窗 */}
       {enlargedImage && (
         <div className="image-overlay" onClick={() => setEnlargedImage(null)}>
-          <img src={enlargedImage} alt="放大查看"
-            onClick={(e) => e.stopPropagation()}
-          />
+          <img src={enlargedImage} alt="放大查看" onClick={(e) => e.stopPropagation()} />
         </div>
       )}
     </div>
