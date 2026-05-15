@@ -108,8 +108,17 @@ export default function ExerciseTracker({
         exercises.map((ex) => {
           const completed = getCompletedSets(ex.id);
           const allDone = completed >= ex.target_sets;
+          const isCurrent = ex.id === currentExerciseId;
+          const isUnfinished = ex.is_required && !allDone && isToday;
+          const cardClass = [
+            'exercise-card',
+            isCurrent ? 'card-current' : '',
+            isUnfinished ? 'card-unfinished' : '',
+          ].filter(Boolean).join(' ');
           return (
-            <div key={ex.id} className="exercise-card" style={allDone ? { opacity: 0.7 } : undefined}>
+            <div key={ex.id}
+              ref={(el) => { exerciseRefs.current[ex.id] = el; }}
+              className={cardClass} style={allDone ? { opacity: 0.7 } : undefined}>
               <div style={{ display: 'flex', gap: 16 }}>
                 {/* 缩略图 */}
                 {ex.image_data && (
