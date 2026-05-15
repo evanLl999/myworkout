@@ -30,6 +30,21 @@ export default function ExerciseTracker({
   const [enlargedImage, setEnlargedImage] = useState<string | null>(null);
   const [sparks, setSparks] = useState<Spark[]>([]);
   const sparkIdRef = useRef(0);
+  const exerciseRefs = useRef<Record<number, HTMLDivElement | null>>({});
+
+  // 当前正在训练的动作（第一个未完成的必练）
+  const currentExerciseId = isToday
+    ? exercises.find((ex) => ex.is_required && getCompletedSets(ex.id) < ex.target_sets)?.id ?? null
+    : null;
+
+  // 自动滚动到当前训练动作
+  useEffect(() => {
+    if (currentExerciseId == null) return;
+    const el = exerciseRefs.current[currentExerciseId];
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [currentExerciseId, setLogs.length]);
 
   useEffect(() => {
     const w: Record<number, number> = {};
