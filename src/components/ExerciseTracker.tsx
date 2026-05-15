@@ -109,7 +109,7 @@ export default function ExerciseTracker({
           const completed = getCompletedSets(ex.id);
           const allDone = completed >= ex.target_sets;
           const isCurrent = ex.id === currentExerciseId;
-          const isUnfinished = ex.is_required && !allDone && isToday;
+          const isUnfinished = ex.is_required && !allDone && !isCurrent && isToday;
           const cardClass = [
             'exercise-card',
             isCurrent ? 'card-current' : '',
