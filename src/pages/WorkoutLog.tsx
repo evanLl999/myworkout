@@ -282,7 +282,7 @@ export default function WorkoutLog() {
       {!(isPastEmpty || isFutureEmpty || isTodayEmpty) && (
         <>
           {hasTrainingStarted && (
-            <div style={{ marginBottom: 16 }}>
+            <div className="sticky-timer" style={{ marginBottom: 16, paddingTop: 8, paddingBottom: 8 }}>
               <RestTimer lastCheckInTime={lastCheckInTime} isComplete={allCompleted || hasTrainingEnded} />
             </div>
           )}
