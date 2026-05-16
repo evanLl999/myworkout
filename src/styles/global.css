@@ -403,12 +403,14 @@ select.form-input {
 /* ========== Rest Timer ========== */
 
 .sticky-timer {
-  position: sticky;
+  position: fixed;
   top: 44px;
+  left: 0;
+  right: 0;
   z-index: 50;
   background: var(--bg);
-  margin: 0 -20px;
-  padding: 0 20px;
+  padding: 8px 20px;
+  border-bottom: 1px solid var(--border);
 }
 
 .rest-timer {
