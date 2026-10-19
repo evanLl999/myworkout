@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import * as api from '../db/api';
 import type { WeightLog } from '../types';
 import WeightChart, { type WeightPoint } from '../components/WeightChart';
-import { ChevronRightIcon, CloseIcon, PlusIcon, TrashIcon, TrendIcon } from '../components/Icons';
+import { ChevronRightIcon, CloseIcon, PlusIcon, TargetIcon, TrashIcon, TrendIcon } from '../components/Icons';
 import { formatDate, monthDayCN, parseDate, weekdayCN } from '../utils/date';
 
 type AssessmentTone = 'good' | 'warn' | 'bad' | 'muted';
@@ -95,13 +95,20 @@ export default function WeightPage() {
   const [loading, setLoading] = useState(true);
   const [range, setRange] = useState<30 | 90 | 0>(30);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [goalSheetOpen, setGoalSheetOpen] = useState(false);
   const [editing, setEditing] = useState<WeightLog | null>(null);
+  const [goal, setGoal] = useState<number | null>(null);
   const [error, setError] = useState('');
 
   const loadLogs = useCallback(async () => {
     setLoading(true);
     try {
-      setLogs(await api.getWeightLogs());
+      const [weightLogs, weightGoal] = await Promise.all([
+        api.getWeightLogs(),
+        api.getWeightGoal(),
+      ]);
+      setLogs(weightLogs);
+      setGoal(weightGoal);
       setError('');
     } catch (err) {
       setError(err instanceof Error ? err.message : '体重记录加载失败');
@@ -115,13 +122,13 @@ export default function WeightPage() {
   }, [loadLogs]);
 
   useEffect(() => {
-    if (!sheetOpen) return;
+    if (!sheetOpen && !goalSheetOpen) return;
     const previous = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     return () => {
       document.body.style.overflow = previous;
     };
-  }, [sheetOpen]);
+  }, [sheetOpen, goalSheetOpen]);
 
   const latest = logs[logs.length - 1] ?? null;
   const assessment = useMemo(() => assessWeight(logs), [logs]);
@@ -217,7 +224,7 @@ export default function WeightPage() {
         </div>
         <p className="weight-assessment-message">{assessment.message}</p>
 
-        <WeightChart points={rangePoints} />
+        <WeightChart points={rangePoints} goal={goal} />
 
         <div className="chart-range" role="group" aria-label="图表时间范围">
           {[
@@ -234,6 +241,15 @@ export default function WeightPage() {
               {item.label}
             </button>
           ))}
+        </div>
+        <div className="weight-goal-row">
+          <span className={`weight-goal${goal == null ? ' is-empty' : ''}`}>
+            <TargetIcon />
+            {goal != null ? `目标 ${goal.toFixed(1)} kg` : '未设置目标'}
+          </span>
+          <button type="button" className="chart-link" onClick={() => setGoalSheetOpen(true)}>
+            {goal == null ? '设置目标' : '修改目标'}
+          </button>
         </div>
         <p className="weight-standard">良好区间：每周下降 0.25–0.75 kg · 仅作趋势参考</p>
       </section>
@@ -292,6 +308,18 @@ export default function WeightPage() {
           onClose={() => setSheetOpen(false)}
           onSaved={handleSaved}
           onDelete={editing ? () => handleDelete(editing) : undefined}
+        />,
+        document.body
+      )}
+
+      {goalSheetOpen && createPortal(
+        <GoalSheet
+          goal={goal}
+          onClose={() => setGoalSheetOpen(false)}
+          onSaved={async () => {
+            setGoalSheetOpen(false);
+            await loadLogs();
+          }}
         />,
         document.body
       )}
@@ -395,6 +423,95 @@ function WeightSheet({
           <button type="button" className="btn btn-ghost" onClick={onClose}>取消</button>
           <button type="button" className="btn btn-primary" onClick={handleSave} disabled={saving}>
             {saving ? '保存中...' : '保存记录'}
+          </button>
+        </footer>
+      </div>
+    </div>
+  );
+}
+
+function GoalSheet({
+  goal,
+  onClose,
+  onSaved,
+}: {
+  goal: number | null;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [value, setValue] = useState(goal != null ? String(goal) : '');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  async function save(clear = false) {
+    if (clear) {
+      setSaving(true);
+      try {
+        await api.saveWeightGoal(null);
+        await onSaved();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : '保存失败');
+        setSaving(false);
+      }
+      return;
+    }
+
+    const target = parseFloat(value);
+    if (!Number.isFinite(target) || target <= 0 || target > 500) {
+      setError('请填写有效的目标体重');
+      return;
+    }
+    setSaving(true);
+    setError('');
+    try {
+      await api.saveWeightGoal(target);
+      await onSaved();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '保存失败');
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="sheet-backdrop" onClick={onClose}>
+      <div className="sheet" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+        <div className="sheet-handle" />
+        <header className="sheet-head">
+          <div>
+            <span className="eyebrow">TARGET WEIGHT</span>
+            <h2 className="sheet-title">设置目标体重</h2>
+          </div>
+          <button type="button" className="icon-btn" onClick={onClose} aria-label="关闭">
+            <CloseIcon />
+          </button>
+        </header>
+
+        <div className="sheet-body">
+          {error && <div className="form-error">{error}</div>}
+          <label className="field">
+            <span className="field-label">目标体重 kg</span>
+            <input
+              className="input input-weight"
+              type="text"
+              inputMode="decimal"
+              placeholder="例如 85.0"
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+            />
+          </label>
+          <p className="field-hint">目标线会显示在趋势图上，方便看距离和进度。</p>
+          {goal != null && (
+            <button type="button" className="text-btn text-btn-danger" onClick={() => save(true)}>
+              <TrashIcon />
+              清除目标
+            </button>
+          )}
+        </div>
+
+        <footer className="sheet-footer">
+          <button type="button" className="btn btn-ghost" onClick={onClose}>取消</button>
+          <button type="button" className="btn btn-primary" onClick={() => save(false)} disabled={saving}>
+            {saving ? '保存中...' : '保存目标'}
           </button>
         </footer>
       </div>

@@ -4,7 +4,7 @@
 
 | 运行方式 | 实现 | 位置 |
 |---|---|---|
-| 手机 PWA / 浏览器 | IndexedDB | 数据库 `myworkout`，DB_VERSION 2，7 个 object store |
+| 手机 PWA / 浏览器 | IndexedDB | 数据库 `myworkout`，DB_VERSION 3，8 个 object store |
 | Electron | sql.js + SQLite | `userData/myworkout.db` |
 
 两套存储结构保持一致，字段名使用 snake_case。
@@ -110,6 +110,15 @@
 | note | string | 生重、去壳、熟重等称重方式 |
 | sort_order | number | 排序 |
 
+## 8. app_settings — 本地设置
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| key | string | 主键，如 `weight_goal` |
+| value | string | 值，字符串存储 |
+
+目前用于保存目标体重。目标线显示在体重趋势图上，并包含在备份中。
+
 ## 备份格式
 
 导出文件是 JSON：
@@ -117,7 +126,7 @@
 ```json
 {
   "app": "myworkout",
-  "version": 2,
+  "version": 3,
   "exported_at": "2026-10-20T12:00:00.000Z",
   "configs": [],
   "sessions": [],
@@ -125,7 +134,8 @@
   "weight_changes": [],
   "weight_logs": [],
   "nutrition_plans": [],
-  "nutrition_items": []
+  "nutrition_items": [],
+  "app_settings": []
 }
 ```
 
@@ -134,7 +144,7 @@
 
 ## 迁移规则
 
-- IndexedDB 当前 DB_VERSION 为 2；从 v1 升级时新增 `weight_logs`、`nutrition_plans`、
-  `nutrition_items` 三个 store，旧数据不受影响。
+- IndexedDB 当前 DB_VERSION 为 3；从 v1 升级时新增 `weight_logs`、`nutrition_plans`、
+  `nutrition_items`，v3 再新增 `app_settings`；旧数据不受影响。
 - SQLite 新增字段使用 `ALTER TABLE ... ADD COLUMN`，并包在 try/catch 中处理字段已存在。
 - 新增字段必须有默认值或允许为 null，保证旧数据库可以直接打开。

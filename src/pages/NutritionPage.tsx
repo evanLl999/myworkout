@@ -3,9 +3,10 @@ import { createPortal } from 'react-dom';
 import * as api from '../db/api';
 import type {
   NutritionItemInput,
+  NutritionPlan,
   NutritionPlanWithItems,
 } from '../types';
-import { CloseIcon, EditIcon, PlusIcon, TrashIcon } from '../components/Icons';
+import { CloseIcon, EditIcon, HistoryIcon, PlusIcon, TrashIcon } from '../components/Icons';
 import { formatDate } from '../utils/date';
 
 interface DraftItem extends NutritionItemInput {
@@ -19,7 +20,7 @@ function uid(): string {
 
 function toDraftItems(plan: NutritionPlanWithItems): DraftItem[] {
   return plan.items.map((item) => ({
-    key: `item-${item.id}`,
+    key: uid(),
     id: item.id,
     meal: item.meal,
     food_name: item.food_name,
@@ -30,21 +31,50 @@ function toDraftItems(plan: NutritionPlanWithItems): DraftItem[] {
   }));
 }
 
+function nextPhaseName(current: string, plans: NutritionPlan[]): string {
+  const numbers = plans.map((plan) => {
+    const match = plan.name.match(/(\d+)\s*$/);
+    return match ? Number(match[1]) : 0;
+  });
+  const next = Math.max(0, ...numbers) + 1;
+  const base = current.replace(/\s*\d+\s*$/, '').trim() || '膳食阶段';
+  return `${base} ${String(next).padStart(2, '0')}`;
+}
+
+function draftFromPlan(plan: NutritionPlanWithItems, plans: NutritionPlan[]): NutritionPlanWithItems {
+  return {
+    ...plan,
+    id: 0,
+    name: nextPhaseName(plan.name, plans),
+    start_date: formatDate(new Date()),
+    items: plan.items.map((item, index) => ({
+      ...item,
+      id: -(index + 1),
+      sort_order: index + 1,
+    })),
+  };
+}
+
 export default function NutritionPage() {
   const [plan, setPlan] = useState<NutritionPlanWithItems | null>(null);
+  const [plans, setPlans] = useState<NutritionPlan[]>([]);
   const [latestWeight, setLatestWeight] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [sheetPlan, setSheetPlan] = useState<NutritionPlanWithItems | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [error, setError] = useState('');
 
   const loadPlan = useCallback(async () => {
     setLoading(true);
     try {
-      const [nutrition, weights] = await Promise.all([
+      const [nutrition, weights, historyPlans] = await Promise.all([
         api.ensureNutritionTemplate(),
         api.getWeightLogs(),
+        api.getNutritionPlans(),
       ]);
       setPlan(nutrition);
+      setPlans(historyPlans);
       setLatestWeight(weights.length > 0 ? weights[weights.length - 1].weight_kg : null);
       setError('');
     } catch (err) {
@@ -59,13 +89,13 @@ export default function NutritionPage() {
   }, [loadPlan]);
 
   useEffect(() => {
-    if (!sheetOpen) return;
+    if (!sheetOpen && !historyOpen) return;
     const previous = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     return () => {
       document.body.style.overflow = previous;
     };
-  }, [sheetOpen]);
+  }, [sheetOpen, historyOpen]);
 
   const macros = useMemo(() => {
     if (!plan) return null;
@@ -88,7 +118,31 @@ export default function NutritionPage() {
 
   async function handleSaved() {
     setSheetOpen(false);
+    setSheetPlan(null);
     await loadPlan();
+  }
+
+  function openEdit() {
+    if (!plan) return;
+    setSheetPlan(plan);
+    setSheetOpen(true);
+  }
+
+  function openNewPhase() {
+    if (!plan) return;
+    setHistoryOpen(false);
+    setSheetPlan(draftFromPlan(plan, plans));
+    setSheetOpen(true);
+  }
+
+  async function activatePlan(id: number) {
+    try {
+      await api.activateNutritionPlan(id);
+      setHistoryOpen(false);
+      await loadPlan();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '切换阶段失败');
+    }
   }
 
   return (
@@ -98,15 +152,26 @@ export default function NutritionPage() {
           <span className="eyebrow">FUEL / PLAN</span>
           <h1 className="page-title">膳食指南</h1>
         </div>
-        <button
-          type="button"
-          className="icon-btn icon-btn-accent"
-          onClick={() => setSheetOpen(true)}
-          aria-label="编辑膳食计划"
-          disabled={!plan}
-        >
-          <EditIcon />
-        </button>
+        <div className="page-actions">
+          <button
+            type="button"
+            className="icon-btn"
+            onClick={() => setHistoryOpen(true)}
+            aria-label="阶段历史"
+            disabled={!plan}
+          >
+            <HistoryIcon />
+          </button>
+          <button
+            type="button"
+            className="icon-btn icon-btn-accent"
+            onClick={openEdit}
+            aria-label="编辑膳食计划"
+            disabled={!plan}
+          >
+            <EditIcon />
+          </button>
+        </div>
       </header>
 
       {error && (
@@ -213,11 +278,25 @@ export default function NutritionPage() {
         </div>
       )}
 
-      {sheetOpen && plan && createPortal(
+      {sheetOpen && sheetPlan && createPortal(
         <NutritionSheet
-          plan={plan}
-          onClose={() => setSheetOpen(false)}
+          plan={sheetPlan}
+          onClose={() => {
+            setSheetOpen(false);
+            setSheetPlan(null);
+          }}
           onSaved={handleSaved}
+        />,
+        document.body
+      )}
+
+      {historyOpen && plan && createPortal(
+        <NutritionHistorySheet
+          plans={plans}
+          activeId={plan.id}
+          onActivate={activatePlan}
+          onNew={openNewPhase}
+          onClose={() => setHistoryOpen(false)}
         />,
         document.body
       )}
@@ -287,7 +366,7 @@ function NutritionSheet({
     setError('');
     try {
       await api.saveNutritionPlan({
-        id: plan.id,
+        id: plan.id || undefined,
         name: name.trim(),
         start_date: startDate,
         calories: parseFloat(calories) || 0,
@@ -309,8 +388,8 @@ function NutritionSheet({
         <div className="sheet-handle" />
         <header className="sheet-head">
           <div>
-            <span className="eyebrow">EDIT NUTRITION</span>
-            <h2 className="sheet-title">编辑膳食阶段</h2>
+            <span className="eyebrow">{plan.id ? 'EDIT NUTRITION' : 'NEW NUTRITION'}</span>
+            <h2 className="sheet-title">{plan.id ? '编辑膳食阶段' : '新建膳食阶段'}</h2>
           </div>
           <button type="button" className="icon-btn" onClick={onClose} aria-label="关闭">
             <CloseIcon />
@@ -425,6 +504,75 @@ function NutritionSheet({
           <button type="button" className="btn btn-primary" onClick={handleSave} disabled={saving}>
             {saving ? '保存中...' : '保存阶段'}
           </button>
+        </footer>
+      </div>
+    </div>
+  );
+}
+
+function NutritionHistorySheet({
+  plans,
+  activeId,
+  onActivate,
+  onNew,
+  onClose,
+}: {
+  plans: NutritionPlan[];
+  activeId: number;
+  onActivate: (id: number) => void;
+  onNew: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <div className="sheet-backdrop" onClick={onClose}>
+      <div className="sheet history-sheet" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+        <div className="sheet-handle" />
+        <header className="sheet-head">
+          <div>
+            <span className="eyebrow">PHASE HISTORY</span>
+            <h2 className="sheet-title">阶段历史</h2>
+          </div>
+          <button type="button" className="icon-btn" onClick={onClose} aria-label="关闭">
+            <CloseIcon />
+          </button>
+        </header>
+
+        <div className="sheet-body">
+          <p className="history-note">
+            切换阶段只改变当前指南，历史阶段和食材都会保留。新建阶段会复制当前配方作为起点。
+          </p>
+          <div className="phase-list">
+            {plans.map((item) => {
+              const active = item.id === activeId;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  className={`phase-row${active ? ' is-active' : ''}`}
+                  onClick={() => { if (!active) onActivate(item.id); }}
+                  aria-current={active ? 'true' : undefined}
+                >
+                  <div className="phase-row-main">
+                    <span className="phase-row-name">{item.name}</span>
+                    <span className="phase-row-meta">
+                      {item.start_date} · {Math.round(item.calories).toLocaleString('zh-CN')} kcal
+                    </span>
+                    <span className="phase-row-macros">
+                      P {item.protein} · C {item.carbs} · F {item.fat}
+                    </span>
+                  </div>
+                  <span className={`phase-badge${active ? ' is-active' : ''}`}>
+                    {active ? '当前' : '切换'}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <footer className="sheet-footer">
+          <button type="button" className="btn btn-ghost" onClick={onClose}>关闭</button>
+          <button type="button" className="btn btn-primary" onClick={onNew}>新建阶段</button>
         </footer>
       </div>
     </div>

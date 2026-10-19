@@ -3,6 +3,7 @@ import type {
   ExerciseConfig,
   NewExerciseInput,
   NutritionItemInput,
+  NutritionPlan,
   NutritionPlanInput,
   NutritionPlanWithItems,
   SetLog,
@@ -163,11 +164,26 @@ export async function deleteWeightLog(id: number): Promise<void> {
   return browserDB.deleteWeightLog(id);
 }
 
+export async function getWeightGoal(): Promise<number | null> {
+  if (isElectron) return invoke<number | null>('db:getWeightGoal');
+  return browserDB.getWeightGoal();
+}
+
+export async function saveWeightGoal(goal: number | null): Promise<void> {
+  if (isElectron) return invoke<void>('db:saveWeightGoal', goal);
+  return browserDB.saveWeightGoal(goal);
+}
+
 // ========== 膳食计划 ==========
 
 export async function getNutritionPlan(): Promise<NutritionPlanWithItems | null> {
   if (isElectron) return invoke<NutritionPlanWithItems | null>('db:getNutritionPlan');
   return browserDB.getNutritionPlan();
+}
+
+export async function getNutritionPlans(): Promise<NutritionPlan[]> {
+  if (isElectron) return invoke<NutritionPlan[]>('db:getNutritionPlans');
+  return browserDB.getNutritionPlans();
 }
 
 export async function saveNutritionPlan(
@@ -176,6 +192,11 @@ export async function saveNutritionPlan(
 ): Promise<NutritionPlanWithItems> {
   if (isElectron) return invoke<NutritionPlanWithItems>('db:saveNutritionPlan', plan, items);
   return browserDB.saveNutritionPlan(plan, items);
+}
+
+export async function activateNutritionPlan(id: number): Promise<NutritionPlanWithItems | null> {
+  if (isElectron) return invoke<NutritionPlanWithItems | null>('db:activateNutritionPlan', id);
+  return browserDB.activateNutritionPlan(id);
 }
 
 export async function ensureNutritionTemplate(): Promise<NutritionPlanWithItems> {

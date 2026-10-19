@@ -48,11 +48,12 @@ npm run check      # 类型检查 + 生产构建
 训练记录只保存在当前设备。备份入口在「我的计划」页底部，支持导出 JSON、
 复制备份内容和导入恢复。
 
-当前 IndexedDB `DB_VERSION = 2`，在原有 4 个 store 基础上新增：
+当前 IndexedDB `DB_VERSION = 3`，在原有 4 个 store 基础上新增：
 
 - `weight_logs`：体重记录（一天一条）
 - `nutrition_plans`：膳食阶段
 - `nutrition_items`：阶段下的每日食材
+- `app_settings`：目标体重等本地设置
 
 初始膳食模板在 `src/data/nutrition-template.json`，浏览器和 Electron 共用。
 体重评估使用最近 28 天的线性回归斜率 × 7，每周下降 0.25–0.75 kg 为「良好」。

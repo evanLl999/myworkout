@@ -72,6 +72,12 @@ export interface BackupData {
   weight_logs?: WeightLog[];
   nutrition_plans?: NutritionPlan[];
   nutrition_items?: NutritionItem[];
+  app_settings?: AppSetting[];
+}
+
+export interface AppSetting {
+  key: string;
+  value: string;
 }
 
 export interface WeightLog {

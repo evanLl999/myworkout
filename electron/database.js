@@ -135,6 +135,13 @@ async function initDatabase() {
     )
   `);
 
+  db.run(`
+    CREATE TABLE IF NOT EXISTS app_settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    )
+  `);
+
   saveDb();
   return db;
 }
@@ -371,6 +378,24 @@ function deleteWeightLog(id) {
   run('DELETE FROM weight_logs WHERE id = ?', [id]);
 }
 
+function getWeightGoal() {
+  const row = queryOne("SELECT value FROM app_settings WHERE key = 'weight_goal'");
+  const value = Number(row?.value);
+  return Number.isFinite(value) && value > 0 ? value : null;
+}
+
+function saveWeightGoal(goal) {
+  if (goal == null) {
+    run("DELETE FROM app_settings WHERE key = 'weight_goal'");
+    return;
+  }
+  run(
+    `INSERT INTO app_settings (key, value) VALUES ('weight_goal', ?)
+     ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+    [String(goal)]
+  );
+}
+
 // ========== 膳食计划 ==========
 
 function getNutritionPlan() {
@@ -381,6 +406,17 @@ function getNutritionPlan() {
     [plan.id]
   );
   return plan;
+}
+
+function getNutritionPlans() {
+  return queryAll('SELECT * FROM nutrition_plans ORDER BY start_date DESC, id DESC');
+}
+
+function activateNutritionPlan(id) {
+  const exists = queryOne('SELECT id FROM nutrition_plans WHERE id = ?', [id]);
+  if (!exists) return null;
+  run('UPDATE nutrition_plans SET is_active = CASE WHEN id = ? THEN 1 ELSE 0 END', [id]);
+  return getNutritionPlan();
 }
 
 function saveNutritionPlan(plan, items) {
@@ -443,7 +479,7 @@ function ensureNutritionTemplate() {
 function exportAll() {
   return {
     app: 'myworkout',
-    version: 2,
+    version: 3,
     exported_at: new Date().toISOString(),
     configs: queryAll('SELECT * FROM exercise_configs ORDER BY id'),
     sessions: queryAll('SELECT * FROM workout_sessions ORDER BY id'),
@@ -452,6 +488,7 @@ function exportAll() {
     weight_logs: queryAll('SELECT * FROM weight_logs ORDER BY id'),
     nutrition_plans: queryAll('SELECT * FROM nutrition_plans ORDER BY id'),
     nutrition_items: queryAll('SELECT * FROM nutrition_items ORDER BY id'),
+    app_settings: queryAll('SELECT * FROM app_settings ORDER BY key'),
   };
 }
 
@@ -471,6 +508,7 @@ function importAll(payload) {
   try {
     db.run('DELETE FROM set_logs');
     db.run('DELETE FROM nutrition_items');
+    db.run('DELETE FROM app_settings');
     db.run('DELETE FROM weight_changes');
     db.run('DELETE FROM weight_logs');
     db.run('DELETE FROM workout_sessions');
@@ -553,6 +591,13 @@ function importAll(payload) {
       );
     }
 
+    for (const setting of payload.app_settings ?? []) {
+      db.run(
+        'INSERT INTO app_settings (key, value) VALUES (?, ?)',
+        [setting.key, setting.value]
+      );
+    }
+
     db.run('COMMIT');
   } catch (err) {
     try { db.run('ROLLBACK'); } catch (_) {}
@@ -583,8 +628,12 @@ module.exports = {
   getWeightLogs,
   saveWeightLog,
   deleteWeightLog,
+  getWeightGoal,
+  saveWeightGoal,
   getNutritionPlan,
+  getNutritionPlans,
   saveNutritionPlan,
+  activateNutritionPlan,
   ensureNutritionTemplate,
   exportAll,
   importAll,

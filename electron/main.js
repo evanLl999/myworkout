@@ -116,12 +116,28 @@ function registerIpcHandlers() {
     return db.deleteWeightLog(id);
   }));
 
+  ipcMain.handle('db:getWeightGoal', safeHandler(() => {
+    return db.getWeightGoal();
+  }));
+
+  ipcMain.handle('db:saveWeightGoal', safeHandler((_event, goal) => {
+    return db.saveWeightGoal(goal);
+  }));
+
   ipcMain.handle('db:getNutritionPlan', safeHandler(() => {
     return db.getNutritionPlan();
   }));
 
+  ipcMain.handle('db:getNutritionPlans', safeHandler(() => {
+    return db.getNutritionPlans();
+  }));
+
   ipcMain.handle('db:saveNutritionPlan', safeHandler((_event, plan, items) => {
     return db.saveNutritionPlan(plan, items);
+  }));
+
+  ipcMain.handle('db:activateNutritionPlan', safeHandler((_event, id) => {
+    return db.activateNutritionPlan(id);
   }));
 
   ipcMain.handle('db:ensureNutritionTemplate', safeHandler(() => {

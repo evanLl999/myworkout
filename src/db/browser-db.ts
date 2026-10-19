@@ -1,4 +1,5 @@
 import type {
+  AppSetting,
   BackupData,
   ExerciseConfig,
   NewExerciseInput,
@@ -17,7 +18,7 @@ import nutritionTemplate from '../data/nutrition-template.json';
 import { formatDate } from '../utils/date';
 
 const DB_NAME = 'myworkout';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 const STORES = [
   'exercise_configs',
   'workout_sessions',
@@ -26,6 +27,7 @@ const STORES = [
   'weight_logs',
   'nutrition_plans',
   'nutrition_items',
+  'app_settings',
 ] as const;
 
 type StoreName = typeof STORES[number];
@@ -63,6 +65,9 @@ function openDB(): Promise<IDBDatabase> {
       if (!db.objectStoreNames.contains('nutrition_items')) {
         const store = db.createObjectStore('nutrition_items', { keyPath: 'id', autoIncrement: true });
         store.createIndex('plan_id', 'plan_id');
+      }
+      if (!db.objectStoreNames.contains('app_settings')) {
+        db.createObjectStore('app_settings', { keyPath: 'key' });
       }
     };
     req.onsuccess = () => resolve(req.result);
@@ -172,6 +177,14 @@ async function writeNutritionPlan(
     });
   }
   await transactionDone(tx);
+
+  const plans = await getAll<NutritionPlan>(store(db, 'nutrition_plans'));
+  const activeTx = db.transaction('nutrition_plans', 'readwrite');
+  const planStore = activeTx.objectStore('nutrition_plans');
+  for (const plan of plans) {
+    planStore.put({ ...plan, is_active: plan.id === planId ? 1 : 0 });
+  }
+  await transactionDone(activeTx);
 
   const saved = await readNutritionPlan();
   if (!saved) throw new Error('膳食计划保存失败');
@@ -459,8 +472,35 @@ const browserDB = {
     await deleteOne(store(db, 'weight_logs', 'readwrite'), id);
   },
 
+  async getWeightGoal(): Promise<number | null> {
+    const db = await openDB();
+    const record = await request<AppSetting | undefined>(
+      store(db, 'app_settings').get('weight_goal') as IDBRequest<AppSetting | undefined>
+    );
+    const value = Number(record?.value);
+    return Number.isFinite(value) && value > 0 ? value : null;
+  },
+
+  async saveWeightGoal(goal: number | null): Promise<void> {
+    const db = await openDB();
+    if (goal == null) {
+      await deleteOne(store(db, 'app_settings', 'readwrite'), 'weight_goal');
+      return;
+    }
+    await putOne(store(db, 'app_settings', 'readwrite'), {
+      key: 'weight_goal',
+      value: String(goal),
+    });
+  },
+
   async getNutritionPlan(): Promise<NutritionPlanWithItems | null> {
     return readNutritionPlan();
+  },
+
+  async getNutritionPlans(): Promise<NutritionPlan[]> {
+    const db = await openDB();
+    const plans = await getAll<NutritionPlan>(store(db, 'nutrition_plans'));
+    return plans.sort((a, b) => b.start_date.localeCompare(a.start_date) || b.id - a.id);
   },
 
   async saveNutritionPlan(
@@ -468,6 +508,19 @@ const browserDB = {
     items: NutritionItemInput[]
   ): Promise<NutritionPlanWithItems> {
     return writeNutritionPlan(plan, items);
+  },
+
+  async activateNutritionPlan(id: number): Promise<NutritionPlanWithItems | null> {
+    const db = await openDB();
+    const plans = await getAll<NutritionPlan>(store(db, 'nutrition_plans'));
+    if (!plans.some((plan) => plan.id === id)) return null;
+    const tx = db.transaction('nutrition_plans', 'readwrite');
+    const planStore = tx.objectStore('nutrition_plans');
+    for (const plan of plans) {
+      planStore.put({ ...plan, is_active: plan.id === id ? 1 : 0 });
+    }
+    await transactionDone(tx);
+    return readNutritionPlan();
   },
 
   async ensureNutritionTemplate(): Promise<NutritionPlanWithItems> {
@@ -489,7 +542,7 @@ const browserDB = {
 
   async exportAll(): Promise<BackupData> {
     const db = await openDB();
-    const [configs, sessions, set_logs, weight_changes, weight_logs, nutrition_plans, nutrition_items] = await Promise.all([
+    const [configs, sessions, set_logs, weight_changes, weight_logs, nutrition_plans, nutrition_items, app_settings] = await Promise.all([
       getAll<ExerciseConfig>(store(db, 'exercise_configs')),
       getAll<WorkoutSession>(store(db, 'workout_sessions')),
       getAll<SetLog>(store(db, 'set_logs')),
@@ -497,10 +550,11 @@ const browserDB = {
       getAll<WeightLog>(store(db, 'weight_logs')),
       getAll<NutritionPlan>(store(db, 'nutrition_plans')),
       getAll<NutritionItem>(store(db, 'nutrition_items')),
+      getAll<AppSetting>(store(db, 'app_settings')),
     ]);
     return {
       app: 'myworkout',
-      version: 2,
+      version: 3,
       exported_at: new Date().toISOString(),
       configs,
       sessions,
@@ -509,6 +563,7 @@ const browserDB = {
       weight_logs,
       nutrition_plans,
       nutrition_items,
+      app_settings,
     };
   },
 
@@ -532,6 +587,7 @@ const browserDB = {
     for (const weight of data.weight_logs ?? []) tx.objectStore('weight_logs').put(weight);
     for (const plan of data.nutrition_plans ?? []) tx.objectStore('nutrition_plans').put(plan);
     for (const item of data.nutrition_items ?? []) tx.objectStore('nutrition_items').put(item);
+    for (const setting of data.app_settings ?? []) tx.objectStore('app_settings').put(setting);
     await transactionDone(tx);
   },
 };

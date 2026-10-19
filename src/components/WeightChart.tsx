@@ -7,6 +7,7 @@ export interface WeightPoint {
 
 interface Props {
   points: WeightPoint[];
+  goal?: number | null;
 }
 
 interface PlottedPoint {
@@ -47,7 +48,7 @@ function smoothPath(points: PlottedPoint[]): string {
   return path;
 }
 
-export default function WeightChart({ points }: Props) {
+export default function WeightChart({ points, goal }: Props) {
   if (points.length < 2) {
     return (
       <div className="weight-chart-empty">
@@ -62,12 +63,14 @@ export default function WeightChart({ points }: Props) {
   const end = sorted[sorted.length - 1].date;
   const span = Math.max(1, dayIndex(end, start));
   const weights = sorted.map((p) => p.weight_kg);
-  const rawMin = Math.min(...weights);
-  const rawMax = Math.max(...weights);
+  const values = goal != null ? [...weights, goal] : weights;
+  const rawMin = Math.min(...values);
+  const rawMax = Math.max(...values);
   const padding = Math.max(0.35, (rawMax - rawMin) * 0.18);
   const min = rawMin - padding;
   const max = rawMax + padding;
   const range = Math.max(0.1, max - min);
+  const goalY = goal != null ? TOP + (1 - (goal - min) / range) * (BOTTOM - TOP) : null;
 
   const plotted: PlottedPoint[] = sorted.map((point) => ({
     x: LEFT + (dayIndex(point.date, start) / span) * (RIGHT - LEFT),
@@ -109,6 +112,15 @@ export default function WeightChart({ points }: Props) {
 
       <path className="weight-area" d={area} fill="url(#weight-area)" />
       <path className="weight-line" d={line} />
+
+      {goalY != null && (
+        <g>
+          <line className="weight-goal-line" x1={LEFT} y1={goalY} x2={RIGHT} y2={goalY} />
+          <text className="weight-goal-label" x={RIGHT} y={goalY - 5} textAnchor="end">
+            目标 {goal!.toFixed(1)}
+          </text>
+        </g>
+      )}
 
       {plotted.map((point, index) => (
         <circle

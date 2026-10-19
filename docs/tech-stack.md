@@ -41,11 +41,12 @@
 
 ## 身体数据模型
 
-IndexedDB 当前 `DB_VERSION = 2`，在原有 4 个 store 基础上新增：
+IndexedDB 当前 `DB_VERSION = 3`，在原有 4 个 store 基础上新增：
 
 - `weight_logs`：体重记录，一天一条
 - `nutrition_plans`：膳食阶段（热量、蛋白质、碳水、脂肪）
 - `nutrition_items`：阶段下的每日食材
+- `app_settings`：目标体重等设置键值
 
 初始膳食模板位于 `src/data/nutrition-template.json`，浏览器和 Electron 共用。
 体重趋势与周速度评估在 `src/pages/WeightPage.tsx` 中计算；
