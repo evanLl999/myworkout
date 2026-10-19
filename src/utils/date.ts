@@ -39,6 +39,29 @@ export function formatDuration(seconds: number): string {
   return `${seconds}s`;
 }
 
+export function formatClock(seconds: number): string {
+  const safe = Math.max(0, Math.floor(seconds));
+  const h = Math.floor(safe / 3600);
+  const m = Math.floor((safe % 3600) / 60);
+  const s = safe % 60;
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return h > 0 ? `${pad(h)}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
+}
+
+export function formatTimeWithSeconds(value: string): string {
+  const d = parseTimestamp(value);
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`;
+}
+
+export function weekdayCN(date: string): string {
+  return ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][parseDate(date).getDay()];
+}
+
+export function monthDayCN(date: string): string {
+  const d = parseDate(date);
+  return `${d.getMonth() + 1}月${d.getDate()}日`;
+}
+
 export function diffSeconds(start: string, end: string): number {
   return Math.floor((parseTimestamp(end).getTime() - parseTimestamp(start).getTime()) / 1000);
 }

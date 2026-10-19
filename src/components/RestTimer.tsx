@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { parseTimestamp } from '../utils/date';
+import { CheckIcon } from './Icons';
 
 interface Props {
   lastCheckInTime: string | null;
@@ -10,9 +11,8 @@ function formatRest(seconds: number): string {
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);
   const s = seconds % 60;
-  if (h > 0) return `${h}h${m}m`;
-  if (m > 0) return `${m}m${s}s`;
-  return `${s}s`;
+  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
 export default function RestTimer({ lastCheckInTime, isComplete }: Props) {
@@ -20,15 +20,27 @@ export default function RestTimer({ lastCheckInTime, isComplete }: Props) {
 
   useEffect(() => {
     if (!lastCheckInTime || isComplete) return;
-    const timer = setInterval(() => setTick((t) => t + 1), 1000);
-    return () => clearInterval(timer);
+    const timer = window.setInterval(() => setTick((t) => t + 1), 1000);
+    return () => window.clearInterval(timer);
   }, [lastCheckInTime, isComplete]);
 
   if (isComplete) {
-    return <span className="rest-timer" style={{ background: 'var(--success)', color: '#fff' }}>训练完成 ✓</span>;
+    return (
+      <div className="rest-pill is-done">
+        <span className="rest-dot" />
+        <span className="rest-label">训练完成</span>
+        <span className="rest-time"><CheckIcon /></span>
+      </div>
+    );
   }
   if (!lastCheckInTime) return null;
 
   const elapsed = Math.max(0, Math.floor((Date.now() - parseTimestamp(lastCheckInTime).getTime()) / 1000));
-  return <span className="rest-timer">休息中: {formatRest(elapsed)}</span>;
+  return (
+    <div className="rest-pill">
+      <span className="rest-dot" />
+      <span className="rest-label">休息中</span>
+      <span className="rest-time">{formatRest(elapsed)}</span>
+    </div>
+  );
 }

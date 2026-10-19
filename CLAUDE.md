@@ -12,6 +12,17 @@ iPhone Safari 打开后选择「添加到主屏幕」，日常使用体验接近
 
 https://evanll999.github.io/myworkout/
 
+## 视觉方向
+
+当前视觉语言是「运动杂志感」：暖白纸张、墨黑结构、焦橙强调。
+
+- 设计令牌集中在 `src/styles/global.css` 的 `:root`。
+- 顶部是品牌栏，底部是浮动 Dock，不再是旧的侧边栏/纯白卡片。
+- 当前训练动作使用墨黑焦点卡；其他动作保持暖白卡片。
+- 图表、图标统一使用 `src/components/Icons.tsx` 的 SVG，不使用 emoji 当图标。
+- 添加/编辑表单和日历使用底部抽屉（portal 到 body，锁定背景滚动）。
+- 强调色可在顶部调色盘切换；不要改背景色和墨黑结构。
+
 ## 启动与验证
 
 ```bash
@@ -19,6 +30,7 @@ npm install
 npm run dev        # Vite + Electron 开发模式
 npm run build      # 生产构建（输出 dist/）
 npx tsc --noEmit   # 类型检查（vite build 不做类型检查）
+npm run check      # 类型检查 + 生产构建
 ```
 
 推送到 `master` 后，`.github/workflows/deploy.yml` 会自动构建并发布到 GitHub Pages。
@@ -55,8 +67,9 @@ npx tsc --noEmit   # 类型检查（vite build 不做类型检查）
    `import.meta.env.BASE_URL` 或相对路径，保证部署在 `/myworkout/` 子路径下可用。
 4. **类型检查必须通过**：提交前运行 `npx tsc --noEmit`。
 5. **保持简洁**：代码不加多余注释，组件专注单一职责，能用原生 CSS 就不加依赖。
-6. **安全第一**：Electron 保持 contextIsolation + preload 白名单，所有数据库操作走 IPC。
-7. **记录开发日志**：每次开发会话结束，在 `dev-log/YYYY-MM-DD.md` 记录已完成、待办、风险。
+6. **视觉一致**：新增组件先复用设计令牌和 `Icons.tsx`，不要引入 emoji 图标或第三方 UI 库。
+7. **安全第一**：Electron 保持 contextIsolation + preload 白名单，所有数据库操作走 IPC。
+8. **记录开发日志**：每次开发会话结束，在 `dev-log/YYYY-MM-DD.md` 记录已完成、待办、风险。
 
 ## 技术要点
 
@@ -66,4 +79,7 @@ npx tsc --noEmit   # 类型检查（vite build 不做类型检查）
 - 浏览器数据库：`src/db/browser-db.ts`，IndexedDB
 - 桌面数据库：`electron/database.js`，sql.js
 - 样式：`src/styles/global.css`，CSS 变量，主色 `--primary`
+- 训练状态卡：`src/components/SessionHero.tsx`
+- 图标库：`src/components/Icons.tsx`
+- 添加/编辑抽屉：`src/components/DayConfig.tsx`
 - PWA：`public/sw.js` + `public/manifest.json`，导航请求网络优先、静态资源缓存优先

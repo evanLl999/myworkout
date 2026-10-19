@@ -2,9 +2,11 @@
   "name": "MyWorkOut - 健身日志",
   "short_name": "MyWorkOut",
   "start_url": ".",
+  "scope": "./",
   "display": "standalone",
-  "background_color": "#F5F8FC",
-  "theme_color": "#5B9BD5",
+  "orientation": "portrait",
+  "background_color": "#F2EFE8",
+  "theme_color": "#C9451B",
   "icons": [
     {
       "src": "icon-192.png",

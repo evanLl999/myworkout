@@ -1,10 +1,14 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
+import { ChevronLeftIcon, ChevronRightIcon, CloseIcon } from './Icons';
 
 interface Props {
   selectedDate: string;
   onSelect: (date: string) => void;
   onClose: () => void;
 }
+
+const WEEKDAYS = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
 
 function formatDate(y: number, m: number, d: number): string {
   return `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
@@ -20,7 +24,7 @@ export default function CalendarPicker({ selectedDate, onSelect, onClose }: Prop
     return m - 1;
   });
 
-  const firstDay = new Date(viewYear, viewMonth, 1).getDay(); // 0=Sun
+  const firstDay = new Date(viewYear, viewMonth, 1).getDay();
   const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
   const cells: (number | null)[] = [];
 
@@ -32,6 +36,14 @@ export default function CalendarPicker({ selectedDate, onSelect, onClose }: Prop
   }
 
   const today = formatDate(new Date().getFullYear(), new Date().getMonth(), new Date().getDate());
+
+  useEffect(() => {
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, []);
 
   function prevMonth() {
     if (viewMonth === 0) {
@@ -56,47 +68,54 @@ export default function CalendarPicker({ selectedDate, onSelect, onClose }: Prop
     onClose();
   }
 
-  return (
-    <div style={{
-      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.3)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
-    }} onClick={onClose}>
-      <div className="card" style={{ width: 320, padding: 20 }} onClick={(e) => e.stopPropagation()}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <button className="btn btn-outline btn-sm" onClick={prevMonth}>←</button>
-          <span style={{ fontWeight: 600 }}>
-            {viewMonth + 1}月
-          </span>
-          <button className="btn btn-outline btn-sm" onClick={nextMonth}>→</button>
+  return createPortal(
+    <div className="sheet-backdrop" onClick={onClose}>
+      <div className="sheet calendar-sheet" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+        <div className="sheet-handle" />
+        <header className="calendar-head">
+          <div>
+            <span className="eyebrow">CALENDAR</span>
+            <h2 className="sheet-title">{viewYear}年 {viewMonth + 1}月</h2>
+          </div>
+          <div className="calendar-actions">
+            <button type="button" className="icon-btn" onClick={prevMonth} aria-label="上个月">
+              <ChevronLeftIcon />
+            </button>
+            <button type="button" className="icon-btn" onClick={nextMonth} aria-label="下个月">
+              <ChevronRightIcon />
+            </button>
+            <button type="button" className="icon-btn" onClick={onClose} aria-label="关闭">
+              <CloseIcon />
+            </button>
+          </div>
+        </header>
+
+        <div className="calendar-weekdays">
+          {WEEKDAYS.map((day) => <span key={day}>{day}</span>)}
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4, textAlign: 'center' }}>
-          {['一', '二', '三', '四', '五', '六', '日'].map((n) => (
-            <div key={n} style={{ fontSize: 12, color: 'var(--text-secondary)', padding: '4px 0' }}>{n}</div>
-          ))}
-          {cells.map((d, i) => {
-            if (d === null) return <div key={`e${i}`} />;
-            const dateStr = formatDate(viewYear, viewMonth, d);
-            const isSelected = dateStr === selectedDate;
-            const isToday = dateStr === today;
+
+        <div className="calendar-grid">
+          {cells.map((day, index) => {
+            if (day === null) return <span key={`empty-${index}`} />;
+            const dateStr = formatDate(viewYear, viewMonth, day);
+            const classes = ['calendar-day'];
+            if (dateStr === selectedDate) classes.push('is-selected');
+            if (dateStr === today) classes.push('is-today');
             return (
               <button
-                key={d}
-                onClick={() => selectDay(d)}
-                style={{
-                  padding: '6px 0', border: 'none', borderRadius: 8, cursor: 'pointer',
-                  fontFamily: 'inherit', fontSize: 14,
-                  background: isSelected ? 'var(--primary-dark)' : isToday ? 'var(--primary-light)' : 'transparent',
-                  color: isSelected ? '#fff' : isToday ? 'var(--primary-dark)' : 'var(--text)',
-                  fontWeight: isSelected || isToday ? 700 : 400,
-                  boxShadow: isSelected ? '0 2px 8px rgba(58,124,195,0.4)' : undefined,
-                }}
+                key={dateStr}
+                type="button"
+                className={classes.join(' ')}
+                onClick={() => selectDay(day)}
+                aria-label={`${viewYear}年${viewMonth + 1}月${day}日`}
               >
-                {d}
+                {day}
               </button>
             );
           })}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

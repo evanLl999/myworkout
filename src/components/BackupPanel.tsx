@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import * as api from '../db/api';
 import type { BackupData } from '../types';
+import { CopyIcon, DownloadIcon, UploadIcon } from './Icons';
 
 export default function BackupPanel() {
   const [busy, setBusy] = useState(false);
@@ -67,21 +68,30 @@ export default function BackupPanel() {
   }
 
   return (
-    <div className="card backup-card">
-      <h3>数据备份</h3>
+    <section className="backup-card">
+      <div className="backup-head">
+        <div>
+          <span className="eyebrow">DATA</span>
+          <h2>数据与备份</h2>
+        </div>
+        <span className="backup-badge">LOCAL ONLY</span>
+      </div>
       <p>
         记录只保存在这台手机的浏览器里。清理 Safari 数据、换手机或系统重装都会丢失，
         建议每隔一段时间导出一份备份。
       </p>
       <div className="backup-actions">
         <button type="button" className="btn btn-primary btn-sm" disabled={busy} onClick={() => handleExport(false)}>
+          <DownloadIcon className="btn-icon" />
           导出备份
         </button>
         <button type="button" className="btn btn-outline btn-sm" disabled={busy} onClick={() => handleExport(true)}>
-          复制备份内容
+          <CopyIcon className="btn-icon" />
+          复制
         </button>
         <button type="button" className="btn btn-outline btn-sm" disabled={busy} onClick={() => fileRef.current?.click()}>
-          导入备份
+          <UploadIcon className="btn-icon" />
+          导入
         </button>
         <input
           ref={fileRef}
@@ -98,7 +108,7 @@ export default function BackupPanel() {
       )}
       {message && <p className="backup-note">{message}</p>}
       {error && <p className="backup-error">{error}</p>}
-    </div>
+    </section>
   );
 }
 

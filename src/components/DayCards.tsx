@@ -1,11 +1,10 @@
 interface Props {
   weekStart: Date;
-  selectedDate: string; // YYYY-MM-DD
+  selectedDate: string;
   onSelect: (date: string) => void;
 }
 
-const DAY_NAMES = ['一', '二', '三', '四', '五', '六', '日'];
-const MONTH_ABBRS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const DAY_NAMES = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
 
 function formatDate(d: Date): string {
   const y = d.getFullYear();
@@ -16,7 +15,7 @@ function formatDate(d: Date): string {
 
 export default function DayCards({ weekStart, selectedDate, onSelect }: Props) {
   const today = formatDate(new Date());
-  const days: { date: string; name: string; dayNum: number; dateLabel: string }[] = [];
+  const days: { date: string; name: string; dayNum: number }[] = [];
 
   for (let i = 0; i < 7; i++) {
     const d = new Date(weekStart);
@@ -25,20 +24,26 @@ export default function DayCards({ weekStart, selectedDate, onSelect }: Props) {
       date: formatDate(d),
       name: DAY_NAMES[i],
       dayNum: d.getDate(),
-      dateLabel: `${d.getDate()} ${MONTH_ABBRS[d.getMonth()]}`,
     });
   }
 
   return (
     <div className="day-cards">
       {days.map((d) => {
-        let cls = 'day-card';
-        if (d.date === selectedDate) cls += ' active';
-        else if (d.date === today) cls += ' today';
+        const classes = ['day-card'];
+        if (d.date === selectedDate) classes.push('is-active');
+        if (d.date === today) classes.push('is-today');
         return (
-          <button key={d.date} className={cls} onClick={() => onSelect(d.date)}>
-            <div className="day-name">周{d.name}</div>
-            <div className="day-date">{d.dateLabel}</div>
+          <button
+            key={d.date}
+            type="button"
+            className={classes.join(' ')}
+            onClick={() => onSelect(d.date)}
+            aria-label={`${d.date} ${d.name}`}
+          >
+            <span className="day-name">{d.name}</span>
+            <span className="day-date">{d.dayNum}</span>
+            <span className="day-dot" />
           </button>
         );
       })}

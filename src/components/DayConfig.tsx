@@ -1,8 +1,18 @@
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import type { ExerciseConfig } from '../types';
 import * as api from '../db/api';
+import {
+  CloseIcon,
+  DumbbellIcon,
+  EditIcon,
+  PlusIcon,
+  TrashIcon,
+  UploadIcon,
+} from './Icons';
 
 const DAY_NAMES = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+const DAY_EN = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
 
 interface ExerciseFormData {
   muscle_group: string;
@@ -21,7 +31,7 @@ const EMPTY_FORM: ExerciseFormData = {
   default_weight: '0',
   target_sets: '4',
   target_reps: '12',
-  sort_order: '0',
+  sort_order: '1',
   image_data: null,
   is_required: true,
 };
@@ -37,11 +47,19 @@ export default function DayConfig() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const formRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     loadExercises(selectedDay);
   }, [selectedDay]);
+
+  useEffect(() => {
+    if (!showForm) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, [showForm]);
 
   async function loadExercises(day: number) {
     setLoading(true);
@@ -51,14 +69,13 @@ export default function DayConfig() {
   }
 
   function handleAdd() {
-    // 自动计算下一个序号
     const nextOrder = exercises.length > 0
       ? Math.max(...exercises.map((e) => e.sort_order)) + 1
       : 1;
     setEditingId(null);
     setForm({ ...EMPTY_FORM, sort_order: String(nextOrder) });
+    setError('');
     setShowForm(true);
-    setTimeout(() => formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
   }
 
   function handleEdit(ex: ExerciseConfig) {
@@ -73,8 +90,14 @@ export default function DayConfig() {
       image_data: ex.image_data,
       is_required: !!ex.is_required,
     });
+    setError('');
     setShowForm(true);
-    setTimeout(() => formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
+  }
+
+  function closeSheet() {
+    if (saving) return;
+    setShowForm(false);
+    setError('');
   }
 
   async function handleDelete(id: number) {
@@ -91,7 +114,10 @@ export default function DayConfig() {
   }
 
   async function handleSave() {
-    if (!form.muscle_group.trim() || !form.exercise_name.trim()) return;
+    if (!form.muscle_group.trim() || !form.exercise_name.trim()) {
+      setError('请填写肌肉群和动作名称');
+      return;
+    }
 
     const data = {
       muscle_group: form.muscle_group.trim(),
@@ -138,7 +164,7 @@ export default function DayConfig() {
   }
 
   function handleRemoveImage() {
-    setForm({ ...form, image_data: null });
+    setForm((prev) => ({ ...prev, image_data: null }));
     if (fileInputRef.current) fileInputRef.current.value = '';
   }
 
@@ -149,174 +175,242 @@ export default function DayConfig() {
 
   return (
     <div>
-      {error && (
-        <div className="error-banner" role="alert">
-          {error}
-          <button type="button" onClick={() => setError('')}>关闭</button>
-        </div>
-      )}
-
-      <div className="tabs">
+      <div className="plan-tabs">
         {DAY_NAMES.map((name, i) => (
           <button
-            key={i}
-            className={`tab${i === selectedDay ? ' active' : ''}`}
+            key={name}
+            type="button"
+            className={`plan-tab${i === selectedDay ? ' is-active' : ''}`}
             onClick={() => handleDayChange(i)}
+            aria-pressed={i === selectedDay}
           >
             {name}
           </button>
         ))}
       </div>
 
+      <div className="plan-head">
+        <div>
+          <span className="eyebrow">{DAY_EN[selectedDay]} / PROGRAM</span>
+          <h2 className="plan-title">{DAY_NAMES[selectedDay]}计划</h2>
+        </div>
+        <span className="plan-count">{exercises.length} 个动作</span>
+      </div>
+
+      {!showForm && error && (
+        <div className="error-banner" role="alert">
+          <span>{error}</span>
+          <button type="button" onClick={() => setError('')}>关闭</button>
+        </div>
+      )}
+
       {loading ? (
-        <p style={{ color: 'var(--text-secondary)', textAlign: 'center', padding: 40 }}>加载中...</p>
-      ) : exercises.length === 0 && !showForm ? (
-        <div className="page-placeholder">
-          这天还没有训练计划，点击下方按钮添加
+        <div className="skeleton-list" aria-label="加载中">
+          <div className="skeleton-card" />
+          <div className="skeleton-card" />
+        </div>
+      ) : exercises.length === 0 ? (
+        <div className="empty-plan">
+          <span className="empty-icon"><DumbbellIcon /></span>
+          <h3>这天还没有动作</h3>
+          <p>从第一个动作开始，慢慢把计划搭起来。</p>
+          <button type="button" className="btn btn-primary btn-sm" onClick={handleAdd}>
+            添加第一个动作
+          </button>
         </div>
       ) : (
-        <div>
+        <div className="plan-list">
           {exercises.map((ex) => (
-            <div key={ex.id} className="exercise-card">
-              <div style={{ display: 'flex', gap: 12 }}>
+            <article key={ex.id} className="plan-card">
+              <div className="plan-card-main">
                 {ex.image_data && (
-                  <div className="exercise-thumb" onClick={() => setEnlargedImage(ex.image_data)}>
+                  <button
+                    type="button"
+                    className="plan-thumb"
+                    onClick={() => setEnlargedImage(ex.image_data)}
+                    aria-label={`查看${ex.exercise_name}参考图`}
+                  >
                     <img src={ex.image_data} alt={ex.exercise_name} />
-                  </div>
+                  </button>
                 )}
-                <div style={{ flex: 1 }}>
-                  <div className="exercise-header">
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span className="exercise-name">{ex.exercise_name}</span>
-                      <span className={`tag ${ex.is_required ? 'tag-required' : 'tag-optional'}`}>
-                        {ex.is_required ? '必练 *' : '选练'}
-                      </span>
-                    </div>
-                    <span className="exercise-muscle">{ex.muscle_group}</span>
+                <div className="plan-card-copy">
+                  <div className="exercise-kicker">
+                    <span>{ex.muscle_group}</span>
+                    <span className="kicker-sep">·</span>
+                    <span>{ex.is_required ? '必练' : '选练'}</span>
                   </div>
-                  <div className="exercise-meta">
-                    <span>{ex.target_sets} 组 × {ex.target_reps} 次</span>
-                    <span>{ex.default_weight} kg</span>
-                    <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>排序 #{ex.sort_order}</span>
-                  </div>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <button type="button" className="btn btn-outline btn-sm" onClick={() => handleEdit(ex)}>编辑</button>
-                    <button type="button" className="btn btn-danger btn-sm" onClick={() => handleDelete(ex.id)}>删除</button>
-                  </div>
+                  <h3 className="plan-card-title">{ex.exercise_name}</h3>
+                  <p className="plan-card-meta">
+                    {ex.target_sets} 组 × {ex.target_reps} 次 · {ex.default_weight} kg
+                  </p>
                 </div>
               </div>
-            </div>
+              <div className="plan-card-actions">
+                <span className="sort-badge">#{ex.sort_order}</span>
+                <button type="button" className="icon-btn" onClick={() => handleEdit(ex)} aria-label={`编辑${ex.exercise_name}`}>
+                  <EditIcon />
+                </button>
+                <button type="button" className="icon-btn is-danger" onClick={() => handleDelete(ex.id)} aria-label={`删除${ex.exercise_name}`}>
+                  <TrashIcon />
+                </button>
+              </div>
+            </article>
           ))}
         </div>
       )}
 
-      {showForm && (
-        <div ref={formRef} className="card" style={{ marginTop: 16 }}>
-          <h3 style={{ marginBottom: 16, fontSize: 16 }}>
-            {editingId ? '编辑动作' : '添加动作'}
-          </h3>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 14 }}>
-            <div className="form-group">
-              <label className="form-label">训练类型</label>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button
-                  type="button"
-                  className={`btn btn-sm ${form.is_required ? 'btn-primary' : 'btn-outline'}`}
-                  onClick={() => setForm({ ...form, is_required: true })}
-                >必练</button>
-                <button
-                  type="button"
-                  className={`btn btn-sm ${!form.is_required ? 'btn-primary' : 'btn-outline'}`}
-                  onClick={() => setForm({ ...form, is_required: false })}
-                >选练</button>
+      {!showForm && exercises.length > 0 && (
+        <button type="button" className="add-exercise" onClick={handleAdd}>
+          <PlusIcon />
+          添加动作
+        </button>
+      )}
+
+      {showForm && createPortal(
+        <div className="sheet-backdrop" onClick={closeSheet}>
+          <div className="sheet" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+            <div className="sheet-handle" />
+            <header className="sheet-head">
+              <div>
+                <span className="eyebrow">{editingId ? 'EDIT EXERCISE' : 'NEW EXERCISE'}</span>
+                <h2 className="sheet-title">{editingId ? '编辑动作' : '添加动作'}</h2>
+              </div>
+              <button type="button" className="icon-btn" onClick={closeSheet} aria-label="关闭">
+                <CloseIcon />
+              </button>
+            </header>
+
+            <div className="sheet-body">
+              {error && <div className="form-error">{error}</div>}
+
+              <div className="field">
+                <span className="field-label">训练类型</span>
+                <div className="segmented">
+                  <button
+                    type="button"
+                    className={form.is_required ? 'is-active' : ''}
+                    onClick={() => setForm({ ...form, is_required: true })}
+                    aria-pressed={form.is_required}
+                  >
+                    必练
+                  </button>
+                  <button
+                    type="button"
+                    className={!form.is_required ? 'is-active' : ''}
+                    onClick={() => setForm({ ...form, is_required: false })}
+                    aria-pressed={!form.is_required}
+                  >
+                    选练
+                  </button>
+                </div>
+              </div>
+
+              <label className="field">
+                <span className="field-label">肌肉群</span>
+                <input
+                  className="input"
+                  placeholder="例如：胸、背、腿"
+                  value={form.muscle_group}
+                  onChange={(e) => setForm({ ...form, muscle_group: e.target.value })}
+                />
+              </label>
+
+              <label className="field">
+                <span className="field-label">动作名称</span>
+                <input
+                  className="input"
+                  placeholder="例如：卧推"
+                  value={form.exercise_name}
+                  onChange={(e) => setForm({ ...form, exercise_name: e.target.value })}
+                />
+              </label>
+
+              <div className="form-grid">
+                <label className="field">
+                  <span className="field-label">配重 kg</span>
+                  <input
+                    className="input"
+                    type="text"
+                    inputMode="decimal"
+                    value={form.default_weight}
+                    onChange={(e) => setForm({ ...form, default_weight: e.target.value })}
+                  />
+                </label>
+                <label className="field">
+                  <span className="field-label">组数</span>
+                  <input
+                    className="input"
+                    type="text"
+                    inputMode="numeric"
+                    value={form.target_sets}
+                    onChange={(e) => setForm({ ...form, target_sets: e.target.value })}
+                  />
+                </label>
+                <label className="field">
+                  <span className="field-label">每组次数</span>
+                  <input
+                    className="input"
+                    type="text"
+                    inputMode="numeric"
+                    value={form.target_reps}
+                    onChange={(e) => setForm({ ...form, target_reps: e.target.value })}
+                  />
+                </label>
+              </div>
+
+              <label className="field">
+                <span className="field-label">排序</span>
+                <input
+                  className="input"
+                  type="text"
+                  inputMode="numeric"
+                  value={form.sort_order}
+                  onChange={(e) => setForm({ ...form, sort_order: e.target.value })}
+                />
+                <span className="field-hint">数字越小越靠前</span>
+              </label>
+
+              <div className="field">
+                <span className="field-label">参考图片</span>
+                {form.image_data ? (
+                  <div className="image-preview">
+                    <img src={form.image_data} alt="动作参考图预览" />
+                    <button type="button" className="image-remove" onClick={handleRemoveImage} aria-label="移除图片">
+                      <CloseIcon />
+                    </button>
+                  </div>
+                ) : (
+                  <label className="image-picker">
+                    <UploadIcon />
+                    <span>添加一张参考图</span>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImagePick}
+                      hidden
+                    />
+                  </label>
+                )}
               </div>
             </div>
-            <div className="form-group">
-              <label className="form-label">排序（数字越小越靠前）</label>
-              <input className="form-input" type="text" inputMode="numeric"
-                value={form.sort_order}
-                onChange={(e) => setForm({ ...form, sort_order: e.target.value })}
-              />
-            </div>
-            <div className="form-group">
-              <label className="form-label">肌肉群</label>
-              <input className="form-input" placeholder="例如：胸、背、腿"
-                value={form.muscle_group}
-                onChange={(e) => setForm({ ...form, muscle_group: e.target.value })}
-              />
-            </div>
-            <div className="form-group">
-              <label className="form-label">动作名称</label>
-              <input className="form-input" placeholder="例如：卧推"
-                value={form.exercise_name}
-                onChange={(e) => setForm({ ...form, exercise_name: e.target.value })}
-              />
-            </div>
-            <div className="form-group">
-              <label className="form-label">配重 (kg)</label>
-              <input className="form-input" type="text" inputMode="decimal"
-                value={form.default_weight}
-                onChange={(e) => setForm({ ...form, default_weight: e.target.value })}
-              />
-            </div>
-            <div className="form-group">
-              <label className="form-label">组数</label>
-              <input className="form-input" type="text" inputMode="numeric"
-                value={form.target_sets}
-                onChange={(e) => setForm({ ...form, target_sets: e.target.value })}
-              />
-            </div>
-            <div className="form-group">
-              <label className="form-label">每组次数</label>
-              <input className="form-input" type="text" inputMode="numeric"
-                value={form.target_reps}
-                onChange={(e) => setForm({ ...form, target_reps: e.target.value })}
-              />
-            </div>
-            <div className="form-group">
-              <label className="form-label">参考图片</label>
-              {form.image_data ? (
-                <div style={{ position: 'relative', display: 'inline-block' }}>
-                  <img src={form.image_data} alt="预览"
-                    style={{ width: 100, height: 100, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--border)' }}
-                  />
-                  <button type="button" onClick={handleRemoveImage}
-                    style={{
-                      position: 'absolute', top: -8, right: -8,
-                      width: 22, height: 22, borderRadius: '50%',
-                      border: '1px solid var(--border)', background: '#fff',
-                      cursor: 'pointer', fontSize: 12, lineHeight: '20px', color: '#e74c3c',
-                    }}
-                  >✕</button>
-                </div>
-              ) : (
-                <div>
-                  <input ref={fileInputRef} type="file" accept="image/*"
-                    onChange={handleImagePick} style={{ fontSize: 13 }}
-                  />
-                </div>
-              )}
-            </div>
+
+            <footer className="sheet-footer">
+              <button type="button" className="btn btn-ghost" onClick={closeSheet}>取消</button>
+              <button type="button" className="btn btn-primary" onClick={handleSave} disabled={saving}>
+                {saving ? '保存中...' : editingId ? '保存修改' : '添加动作'}
+              </button>
+            </footer>
           </div>
-          <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
-            <button type="button" className="btn btn-primary" onClick={handleSave} disabled={saving}>
-              {saving ? '保存中...' : editingId ? '保存修改' : '添加'}
-            </button>
-            <button type="button" className="btn btn-outline" onClick={() => setShowForm(false)}>取消</button>
-          </div>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {!showForm && (
-        <div style={{ marginTop: 16 }}>
-          <button type="button" className="btn btn-primary" onClick={handleAdd}>+ 添加动作</button>
-        </div>
-      )}
-
-      {enlargedImage && (
+      {enlargedImage && createPortal(
         <div className="image-overlay" onClick={() => setEnlargedImage(null)}>
           <img src={enlargedImage} alt="放大查看" onClick={(e) => e.stopPropagation()} />
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

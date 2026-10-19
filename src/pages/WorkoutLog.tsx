@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import type { ExerciseConfig, WorkoutSession, SetLogWithMeta } from '../types';
 import * as api from '../db/api';
 import WeekNavigator from '../components/WeekNavigator';
@@ -7,14 +8,18 @@ import CalendarPicker from '../components/CalendarPicker';
 import ExerciseTracker from '../components/ExerciseTracker';
 import RestTimer from '../components/RestTimer';
 import Fireworks from '../components/Fireworks';
+import SessionHero from '../components/SessionHero';
+import { CalendarIcon, DumbbellIcon, SparkleIcon } from '../components/Icons';
 import {
   diffSeconds,
   formatDate,
   formatDuration,
   formatTime,
   getMonday,
+  monthDayCN,
   parseDate,
   parseTimestamp,
+  weekdayCN,
 } from '../utils/date';
 
 function errorMessage(err: unknown): string {
@@ -44,9 +49,11 @@ export default function WorkoutLog() {
 
   const hasTrainingStarted = !!session?.training_started_at;
   const hasTrainingEnded = !!session?.training_ended_at;
+  const live = isToday && hasTrainingStarted && !hasTrainingEnded;
 
-  // 只有当前计划里的必练动作完成才算计划完成，已归档动作不参与
   const requiredExercises = activeExercises.filter((ex) => ex.is_required);
+  const completedSets = setLogs.length;
+  const plannedSets = activeExercises.reduce((sum, ex) => sum + ex.target_sets, 0);
   const allCompleted = isToday && requiredExercises.length > 0 && requiredExercises.every((ex) => {
     const completed = setLogs.filter((sl) => sl.exercise_config_id === ex.id).length;
     return completed >= ex.target_sets;
@@ -58,9 +65,7 @@ export default function WorkoutLog() {
         setLogs[0].completed_at)
     : null;
 
-  const lastCheckInTime = isToday && hasTrainingStarted && !hasTrainingEnded
-    ? (lastSetTime || session?.training_started_at || null)
-    : null;
+  const lastCheckInTime = live ? lastSetTime : null;
 
   const loadDay = useCallback(async (date: string) => {
     const seq = ++loadSeq.current;
@@ -82,7 +87,6 @@ export default function WorkoutLog() {
       const logs = sess ? await api.getSetLogs(sess.id) : [];
       if (seq !== loadSeq.current) return;
 
-      // 显示当前动作；已归档动作只在当天有打卡记录时显示，避免丢掉历史
       const visibleExercises = configs.filter(
         (config) => !config.is_archived || logs.some((log) => log.exercise_config_id === config.id)
       );
@@ -101,7 +105,6 @@ export default function WorkoutLog() {
     loadDay(selectedDate);
   }, [selectedDate, loadDay]);
 
-  // 必练动作完成时自动标记 session 完成（只处理今天）
   useEffect(() => {
     if (!isToday || !session || activeExercises.length === 0) return;
     const required = activeExercises.filter((ex) => ex.is_required);
@@ -157,7 +160,6 @@ export default function WorkoutLog() {
     if (!exercise) return;
     try {
       let activeSession = session;
-      // 直接点“完成一组”时自动开始训练，避免出现没有开始时间的记录
       if (!activeSession.training_started_at) {
         const started = await api.startTraining(activeSession.id);
         if (started) {
@@ -212,135 +214,138 @@ export default function WorkoutLog() {
   const planDuration = (session?.training_started_at && lastSetTime)
     ? diffSeconds(session.training_started_at, lastSetTime)
     : 0;
-
   const totalDuration = (session?.training_started_at && session?.training_ended_at)
     ? diffSeconds(session.training_started_at, session.training_ended_at)
     : 0;
-
   const extraDuration = totalDuration > planDuration ? totalDuration - planDuration : 0;
+  const showContent = !(isPastEmpty || isFutureEmpty || isTodayEmpty);
 
   return (
     <div className="page">
-      <h1 className="page-title">健身记录</h1>
+      <header className="page-head">
+        <div>
+          <span className="eyebrow">TRAINING LOG</span>
+          <h1 className="page-title">健身记录</h1>
+        </div>
+        <span className="page-date">{monthDayCN(selectedDate)} · {weekdayCN(selectedDate)}</span>
+      </header>
 
-      <WeekNavigator
-        weekStart={weekStart}
-        onPrev={() => shiftWeek(-7)}
-        onNext={() => shiftWeek(7)}
-        onCalendarClick={() => setShowCalendar(true)}
-      />
-
-      <DayCards
-        weekStart={weekStart}
-        selectedDate={selectedDate}
-        onSelect={setSelectedDate}
-      />
+      <section className="week-card">
+        <WeekNavigator
+          weekStart={weekStart}
+          onPrev={() => shiftWeek(-7)}
+          onNext={() => shiftWeek(7)}
+          onCalendarClick={() => setShowCalendar(true)}
+        />
+        <DayCards
+          weekStart={weekStart}
+          selectedDate={selectedDate}
+          onSelect={setSelectedDate}
+        />
+      </section>
 
       {error && (
         <div className="error-banner" role="alert">
-          {error}
+          <span>{error}</span>
           <button type="button" onClick={() => setError('')}>关闭</button>
         </div>
       )}
 
-      {/* 过去未训练 — 空状态 */}
       {isPastEmpty && (
-        <div className="empty-state">
-          <span className="empty-state-text">没有训练吗？</span>
+        <div className="empty-state-card">
+          <span className="empty-icon"><CalendarIcon /></span>
+          <span className="eyebrow">NO SESSION</span>
+          <h2 className="empty-title">这天没有留下记录</h2>
+          <p className="empty-copy">下次练完记得点“完成一组”。</p>
         </div>
       )}
 
-      {/* 未来日期 / 今天无计划 — 空状态 */}
-      {(isFutureEmpty || isTodayEmpty) && (
-        <div className="empty-state">
-          <span className="empty-state-text future">等待你变强</span>
+      {isFutureEmpty && (
+        <div className="empty-state-card">
+          <span className="empty-icon"><SparkleIcon /></span>
+          <span className="eyebrow">COMING UP</span>
+          <h2 className="empty-title">未来还没有发生</h2>
+          <p className="empty-copy">先把今天的训练完成吧。</p>
         </div>
       )}
 
-      {/* 开始/结束训练 控制栏 */}
-      {isToday && !isTodayEmpty && (
-        <div className="training-bar">
-          {!hasTrainingStarted && !hasTrainingEnded && (
-            <button className="btn btn-primary" onClick={handleStartTraining}>
-              开始训练
-            </button>
-          )}
-
-          {session?.training_started_at && (
-            <span className="training-meta">
-              开始时间: <strong>{formatTime(session.training_started_at)}</strong>
-            </span>
-          )}
-
-          {allCompleted && planDuration > 0 && (
-            <span className="training-meta">
-              计划用时: <strong className="text-success">{formatDuration(planDuration)}</strong>
-            </span>
-          )}
-
-          {hasTrainingStarted && !hasTrainingEnded && (
-            <button className="btn btn-outline" onClick={handleEndTraining}>
-              结束训练
-            </button>
-          )}
-
-          {hasTrainingEnded && extraDuration > 0 && (
-            <span className="training-meta">
-              额外用时: <strong>{formatDuration(extraDuration)}</strong>
-            </span>
-          )}
-
-          {hasTrainingEnded && totalDuration > 0 && (
-            <span className="training-meta">
-              总用时: <strong className="text-primary-strong">{formatDuration(totalDuration)}</strong>
-            </span>
-          )}
-
-          <button type="button" className="btn-reset" onClick={handleReset}>
-            重置
-          </button>
+      {isTodayEmpty && (
+        <div className="empty-state-card">
+          <span className="empty-icon"><DumbbellIcon /></span>
+          <span className="eyebrow">REST DAY</span>
+          <h2 className="empty-title">今天还没有安排</h2>
+          <p className="empty-copy">去「我的计划」添加动作，回来开始今天的训练。</p>
+          <Link className="btn btn-primary" to="/profile">去安排计划</Link>
         </div>
       )}
 
-      {/* 历史日期的训练摘要 */}
+      {isToday && !isTodayEmpty && activeExercises.length > 0 && (
+        <SessionHero
+          session={session}
+          allCompleted={allCompleted}
+          exerciseCount={activeExercises.length}
+          plannedSets={plannedSets}
+          completedSets={completedSets}
+          planDuration={planDuration}
+          totalDuration={totalDuration}
+          extraDuration={extraDuration}
+          onStart={handleStartTraining}
+          onEnd={handleEndTraining}
+          onReset={handleReset}
+        />
+      )}
+
       {!isToday && session?.training_started_at && !isPastEmpty && (
-        <div className="training-bar history-summary">
-          <span className="training-meta">开始: <strong>{formatTime(session.training_started_at)}</strong></span>
-          {session.training_ended_at && (
-            <span className="training-meta">结束: <strong>{formatTime(session.training_ended_at)}</strong></span>
-          )}
-          {totalDuration > 0 && (
-            <span className="training-meta">
-              总用时: <strong className="text-primary-strong">{formatDuration(totalDuration)}</strong>
-            </span>
-          )}
+        <section className="history-card">
+          <div className="history-card-head">
+            <span className="eyebrow">HISTORY</span>
+            <span className="history-date">{monthDayCN(selectedDate)}</span>
+          </div>
+          <div className="session-stats">
+            <div>
+              <span className="stat-value">{formatTime(session.training_started_at)}</span>
+              <span className="stat-label">开始</span>
+            </div>
+            {session.training_ended_at && (
+              <div>
+                <span className="stat-value">{formatTime(session.training_ended_at)}</span>
+                <span className="stat-label">结束</span>
+              </div>
+            )}
+            {totalDuration > 0 && (
+              <div>
+                <span className="stat-value">{formatDuration(totalDuration)}</span>
+                <span className="stat-label">总用时</span>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
+      {live && lastCheckInTime && (
+        <div className="rest-strip">
+          <RestTimer lastCheckInTime={lastCheckInTime} isComplete={allCompleted} />
         </div>
       )}
 
-      {/* 正常训练内容（非空状态时显示） */}
-      {!(isPastEmpty || isFutureEmpty || isTodayEmpty) && (
-        <>
-          {isToday && hasTrainingStarted && !hasTrainingEnded && (
-            <div className="sticky-timer">
-              <RestTimer lastCheckInTime={lastCheckInTime} isComplete={allCompleted} />
-            </div>
-          )}
-
-          {loading ? (
-            <p className="loading-text">加载中...</p>
-          ) : (
-            <ExerciseTracker
-              sessionId={session?.id ?? 0}
-              exercises={exercises}
-              setLogs={setLogs}
-              lastCheckInTime={lastCheckInTime}
-              onCheckIn={handleCheckIn}
-              onWeightChange={handleWeightChange}
-              isToday={isToday}
-              readOnly={hasTrainingEnded}
-            />
-          )}
-        </>
+      {showContent && (
+        loading ? (
+          <div className="skeleton-list" aria-label="加载中">
+            <div className="skeleton-card" />
+            <div className="skeleton-card" />
+          </div>
+        ) : (
+          <ExerciseTracker
+            sessionId={session?.id ?? 0}
+            exercises={exercises}
+            setLogs={setLogs}
+            lastCheckInTime={lastCheckInTime}
+            onCheckIn={handleCheckIn}
+            onWeightChange={handleWeightChange}
+            isToday={isToday}
+            readOnly={hasTrainingEnded}
+          />
+        )
       )}
 
       {showCalendar && (

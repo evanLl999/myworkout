@@ -1,4 +1,4 @@
-const CACHE_NAME = 'myworkout-v4';
+const CACHE_NAME = 'myworkout-v5';
 const SCOPE = self.registration.scope;
 const APP_SHELL = [
   SCOPE,

@@ -8,7 +8,7 @@ interface Particle {
   size: number;
 }
 
-const COLORS = ['#FF6B35', '#FFD700', '#FF4136', '#F012BE', '#7FDBFF', '#01FF70', '#FF851B', '#E040FB'];
+const COLORS = ['#FF6B3D', '#FFB020', '#FFE0D3', '#C9451B', '#1E7A55', '#FFF3E8'];
 
 export default function Fireworks({ onDone }: { onDone: () => void }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);

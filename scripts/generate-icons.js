@@ -1,30 +1,30 @@
 const { Jimp } = require('jimp');
 
 async function makeIcon(size) {
-  const img = new Jimp({ width: size, height: size, color: 0x5B9BD5FF });
+  const img = new Jimp({ width: size, height: size, color: 0x181715FF });
   const cx = size / 2;
   const cy = size / 2;
 
-  // 白色哑铃
+  // 米白哑铃
   const barW = Math.floor(size * 0.045);   // 细握把
   const headR = Math.floor(size * 0.095);  // 铃片半径
   const headDist = Math.floor(size * 0.18); // 铃片中心距
 
   // 左铃片
-  drawCircle(img, cx - headDist, cy, headR, 0xFFFFFFFF);
+  drawCircle(img, cx - headDist, cy, headR, 0xFFFCF7FF);
   // 右铃片
-  drawCircle(img, cx + headDist, cy, headR, 0xFFFFFFFF);
+  drawCircle(img, cx + headDist, cy, headR, 0xFFFCF7FF);
 
-  // 铃片内圈（蓝色）
+  // 铃片内圈（焦橙）
   const innerR = Math.floor(headR * 0.62);
-  drawCircle(img, cx - headDist, cy, innerR, 0x5B9BD5FF);
-  drawCircle(img, cx + headDist, cy, innerR, 0x5B9BD5FF);
+  drawCircle(img, cx - headDist, cy, innerR, 0xC9451BFF);
+  drawCircle(img, cx + headDist, cy, innerR, 0xC9451BFF);
 
   // 握把
   for (let x = cx - headDist + headR * 0.6; x < cx + headDist - headR * 0.6; x++) {
     for (let y = cy - barW; y < cy + barW; y++) {
       if (x >= 0 && x < size && y >= 0 && y < size) {
-        img.setPixelColor(0xFFFFFFFF, x, y);
+        img.setPixelColor(0xFFFCF7FF, x, y);
       }
     }
   }
