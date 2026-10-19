@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { parseTimestamp } from '../utils/date';
 
 interface Props {
   lastCheckInTime: string | null;
@@ -6,8 +7,10 @@ interface Props {
 }
 
 function formatRest(seconds: number): string {
-  const m = Math.floor(seconds / 60);
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
   const s = seconds % 60;
+  if (h > 0) return `${h}h${m}m`;
   if (m > 0) return `${m}m${s}s`;
   return `${s}s`;
 }
@@ -26,6 +29,6 @@ export default function RestTimer({ lastCheckInTime, isComplete }: Props) {
   }
   if (!lastCheckInTime) return null;
 
-  const elapsed = Math.floor((Date.now() - new Date(lastCheckInTime).getTime()) / 1000);
-  return <span className="rest-timer">休息: {formatRest(elapsed)}</span>;
+  const elapsed = Math.max(0, Math.floor((Date.now() - parseTimestamp(lastCheckInTime).getTime()) / 1000));
+  return <span className="rest-timer">休息中: {formatRest(elapsed)}</span>;
 }

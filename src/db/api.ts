@@ -1,4 +1,11 @@
-import type { ExerciseConfig, WorkoutSession, SetLog, WeightChange } from '../types';
+import type {
+  BackupData,
+  ExerciseConfig,
+  NewExerciseInput,
+  SetLog,
+  WeightChange,
+  WorkoutSession,
+} from '../types';
 import browserDB from './browser-db';
 
 const isElectron = typeof window !== 'undefined' && !!(window as any).electronAPI;
@@ -9,25 +16,17 @@ function invoke<T>(channel: string, ...args: unknown[]): Promise<T> {
 
 // ========== 训练配置 ==========
 
-export async function getConfigsByDay(dayOfWeek: number): Promise<ExerciseConfig[]> {
-  if (isElectron) return invoke<ExerciseConfig[]>('db:getConfigsByDay', dayOfWeek);
-  return browserDB.getConfigsByDay(dayOfWeek);
+export async function getConfigsByDay(dayOfWeek: number, includeArchived = false): Promise<ExerciseConfig[]> {
+  if (isElectron) return invoke<ExerciseConfig[]>('db:getConfigsByDay', dayOfWeek, includeArchived);
+  return browserDB.getConfigsByDay(dayOfWeek, includeArchived);
 }
 
-export async function getAllConfigs(): Promise<ExerciseConfig[]> {
-  if (isElectron) return invoke<ExerciseConfig[]>('db:getAllConfigs');
-  return browserDB.getAllConfigs();
+export async function getAllConfigs(includeArchived = false): Promise<ExerciseConfig[]> {
+  if (isElectron) return invoke<ExerciseConfig[]>('db:getAllConfigs', includeArchived);
+  return browserDB.getAllConfigs(includeArchived);
 }
 
-export async function addExercise(data: {
-  day_of_week: number;
-  muscle_group: string;
-  exercise_name: string;
-  default_weight: number;
-  target_sets: number;
-  target_reps: number;
-  image_data?: string | null;
-}): Promise<number> {
+export async function addExercise(data: NewExerciseInput): Promise<number> {
   if (isElectron) return invoke<number>('db:addExercise', data);
   return browserDB.addExercise(data) as unknown as number;
 }
@@ -49,9 +48,9 @@ export async function getOrCreateSession(date: string): Promise<WorkoutSession> 
   return browserDB.getOrCreateSession(date) as Promise<WorkoutSession>;
 }
 
-export async function getSessionByDate(date: string): Promise<WorkoutSession | undefined> {
-  if (isElectron) return invoke<WorkoutSession | undefined>('db:getSessionByDate', date);
-  return browserDB.getSessionByDate(date) as Promise<WorkoutSession | undefined>;
+export async function getSessionByDate(date: string): Promise<WorkoutSession | null> {
+  if (isElectron) return invoke<WorkoutSession | null>('db:getSessionByDate', date);
+  return browserDB.getSessionByDate(date);
 }
 
 export async function completeSession(sessionId: number): Promise<void> {
@@ -81,10 +80,31 @@ export async function addSetLog(
   exerciseConfigId: number,
   setNumber: number,
   weightUsed: number,
-  repsDone: number
+  repsDone: number,
+  exerciseName: string,
+  muscleGroup: string
 ): Promise<number> {
-  if (isElectron) return invoke<number>('db:addSetLog', sessionId, exerciseConfigId, setNumber, weightUsed, repsDone);
-  return browserDB.addSetLog(sessionId, exerciseConfigId, setNumber, weightUsed, repsDone) as unknown as number;
+  if (isElectron) {
+    return invoke<number>(
+      'db:addSetLog',
+      sessionId,
+      exerciseConfigId,
+      setNumber,
+      weightUsed,
+      repsDone,
+      exerciseName,
+      muscleGroup
+    );
+  }
+  return browserDB.addSetLog(
+    sessionId,
+    exerciseConfigId,
+    setNumber,
+    weightUsed,
+    repsDone,
+    exerciseName,
+    muscleGroup
+  ) as unknown as number;
 }
 
 export async function getSetLogs(sessionId: number): Promise<(SetLog & { exercise_name: string; muscle_group: string })[]> {
@@ -107,4 +127,16 @@ export async function updateWeight(exerciseConfigId: number, newWeight: number):
 export async function getWeightHistory(exerciseConfigId: number): Promise<WeightChange[]> {
   if (isElectron) return invoke<WeightChange[]>('db:getWeightHistory', exerciseConfigId);
   return browserDB.getWeightHistory(exerciseConfigId);
+}
+
+// ========== 数据备份 ==========
+
+export async function exportAll(): Promise<BackupData> {
+  if (isElectron) return invoke<BackupData>('db:exportAll');
+  return browserDB.exportAll();
+}
+
+export async function importAll(data: BackupData): Promise<void> {
+  if (isElectron) return invoke<void>('db:importAll', data);
+  return browserDB.importAll(data);
 }

@@ -48,6 +48,7 @@ async function initDatabase() {
   // 迁移：为已有数据库添加新字段
   try { db.run("ALTER TABLE exercise_configs ADD COLUMN image_data TEXT"); } catch (_) {}
   try { db.run("ALTER TABLE exercise_configs ADD COLUMN is_required INTEGER NOT NULL DEFAULT 1"); } catch (_) {}
+  try { db.run("ALTER TABLE exercise_configs ADD COLUMN is_archived INTEGER NOT NULL DEFAULT 0"); } catch (_) {}
 
   db.run(`
     CREATE TABLE IF NOT EXISTS workout_sessions (
@@ -76,6 +77,10 @@ async function initDatabase() {
       FOREIGN KEY (exercise_config_id) REFERENCES exercise_configs(id)
     )
   `);
+
+  // 迁移：打卡时保存动作快照，之后改名或归档不影响历史
+  try { db.run("ALTER TABLE set_logs ADD COLUMN exercise_name TEXT"); } catch (_) {}
+  try { db.run("ALTER TABLE set_logs ADD COLUMN muscle_group TEXT"); } catch (_) {}
 
   db.run(`
     CREATE TABLE IF NOT EXISTS weight_changes (
@@ -132,26 +137,38 @@ function queryOne(sql, params = []) {
 
 function run(sql, params = []) {
   db.run(sql, params);
+  const changes = db.getRowsModified();
+  const lastInsertRowid = queryOne('SELECT last_insert_rowid() as id')?.id ?? 0;
   saveDb();
-  return {
-    changes: db.getRowsModified(),
-    lastInsertRowid: queryOne('SELECT last_insert_rowid() as id')?.id ?? 0,
-  };
+  return { changes, lastInsertRowid };
 }
 
 // ========== exercise_configs CRUD ==========
 
-function getConfigsByDay(dayOfWeek) {
-  return queryAll('SELECT * FROM exercise_configs WHERE day_of_week = ? ORDER BY sort_order', [dayOfWeek]);
+function getConfigsByDay(dayOfWeek, includeArchived = false) {
+  return queryAll(
+    `SELECT * FROM exercise_configs
+     WHERE day_of_week = ?${includeArchived ? '' : ' AND is_archived = 0'}
+     ORDER BY sort_order, id`,
+    [dayOfWeek]
+  );
 }
 
-function getAllConfigs() {
-  return queryAll('SELECT * FROM exercise_configs ORDER BY day_of_week, sort_order');
+function getAllConfigs(includeArchived = false) {
+  return queryAll(
+    `SELECT * FROM exercise_configs
+     ${includeArchived ? '' : 'WHERE is_archived = 0'}
+     ORDER BY day_of_week, sort_order, id`
+  );
 }
 
-function addExercise({ day_of_week, muscle_group, exercise_name, default_weight, target_sets, target_reps, image_data, is_required }) {
-  const row = queryOne('SELECT COALESCE(MAX(sort_order), -1) + 1 AS next FROM exercise_configs WHERE day_of_week = ?', [day_of_week]);
-  const sortOrder = row ? row.next : 0;
+function addExercise({ day_of_week, muscle_group, exercise_name, default_weight, target_sets, target_reps, sort_order, image_data, is_required }) {
+  const row = queryOne(
+    'SELECT COALESCE(MAX(sort_order), 0) + 1 AS next FROM exercise_configs WHERE day_of_week = ? AND is_archived = 0',
+    [day_of_week]
+  );
+  const requestedOrder = Number(sort_order);
+  const sortOrder = Number.isFinite(requestedOrder) ? requestedOrder : (row ? row.next : 1);
 
   const result = run(
     `INSERT INTO exercise_configs (day_of_week, muscle_group, exercise_name, default_weight, target_sets, target_reps, sort_order, image_data, is_required)
@@ -181,9 +198,10 @@ function updateExercise(id, fields) {
 }
 
 function deleteExercise(id) {
-  run('DELETE FROM weight_changes WHERE exercise_config_id = ?', [id]);
-  run('DELETE FROM set_logs WHERE exercise_config_id = ?', [id]);
-  const result = run('DELETE FROM exercise_configs WHERE id = ?', [id]);
+  const result = run(
+    "UPDATE exercise_configs SET is_archived = 1, updated_at = datetime('now', 'localtime') WHERE id = ?",
+    [id]
+  );
   return { changes: result.changes };
 }
 
@@ -224,20 +242,23 @@ function resetSession(sessionId) {
 
 // ========== set_logs ==========
 
-function addSetLog(sessionId, exerciseConfigId, setNumber, weightUsed, repsDone) {
+function addSetLog(sessionId, exerciseConfigId, setNumber, weightUsed, repsDone, exerciseName, muscleGroup) {
   const result = run(
-    `INSERT INTO set_logs (session_id, exercise_config_id, set_number, weight_used, reps_done, completed_at)
-     VALUES (?, ?, ?, ?, ?, datetime('now', 'localtime'))`,
-    [sessionId, exerciseConfigId, setNumber, weightUsed, repsDone]
+    `INSERT INTO set_logs
+       (session_id, exercise_config_id, set_number, weight_used, reps_done, exercise_name, muscle_group, completed_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now', 'localtime'))`,
+    [sessionId, exerciseConfigId, setNumber, weightUsed, repsDone, exerciseName ?? null, muscleGroup ?? null]
   );
   return result.lastInsertRowid;
 }
 
 function getSetLogs(sessionId) {
   return queryAll(
-    `SELECT sl.*, ec.exercise_name, ec.muscle_group
+    `SELECT sl.*,
+            COALESCE(sl.exercise_name, ec.exercise_name, '已删除动作') AS exercise_name,
+            COALESCE(sl.muscle_group, ec.muscle_group, '') AS muscle_group
      FROM set_logs sl
-     JOIN exercise_configs ec ON sl.exercise_config_id = ec.id
+     LEFT JOIN exercise_configs ec ON sl.exercise_config_id = ec.id
      WHERE sl.session_id = ?
      ORDER BY sl.completed_at`,
     [sessionId]
@@ -274,6 +295,91 @@ function getWeightHistory(exerciseConfigId) {
   return queryAll('SELECT * FROM weight_changes WHERE exercise_config_id = ? ORDER BY changed_at DESC', [exerciseConfigId]);
 }
 
+// ========== 备份与恢复 ==========
+
+function exportAll() {
+  return {
+    app: 'myworkout',
+    version: 1,
+    exported_at: new Date().toISOString(),
+    configs: queryAll('SELECT * FROM exercise_configs ORDER BY id'),
+    sessions: queryAll('SELECT * FROM workout_sessions ORDER BY id'),
+    set_logs: queryAll('SELECT * FROM set_logs ORDER BY id'),
+    weight_changes: queryAll('SELECT * FROM weight_changes ORDER BY id'),
+  };
+}
+
+function importAll(payload) {
+  if (
+    !payload ||
+    !Array.isArray(payload.configs) ||
+    !Array.isArray(payload.sessions) ||
+    !Array.isArray(payload.set_logs) ||
+    !Array.isArray(payload.weight_changes)
+  ) {
+    throw new Error('备份文件格式不正确');
+  }
+
+  const now = new Date().toISOString();
+  db.run('BEGIN');
+  try {
+    db.run('DELETE FROM set_logs');
+    db.run('DELETE FROM weight_changes');
+    db.run('DELETE FROM workout_sessions');
+    db.run('DELETE FROM exercise_configs');
+
+    for (const c of payload.configs) {
+      db.run(
+        `INSERT INTO exercise_configs
+           (id, day_of_week, muscle_group, exercise_name, default_weight, target_sets, target_reps,
+            sort_order, image_data, is_required, is_archived, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          c.id, c.day_of_week, c.muscle_group, c.exercise_name, c.default_weight ?? 0,
+          c.target_sets ?? 1, c.target_reps ?? 1, c.sort_order ?? 1, c.image_data ?? null,
+          c.is_required ?? 1, c.is_archived ?? 0, c.created_at ?? now, c.updated_at ?? now,
+        ]
+      );
+    }
+
+    for (const s of payload.sessions) {
+      db.run(
+        `INSERT INTO workout_sessions
+           (id, date, started_at, completed_at, training_started_at, training_ended_at)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [s.id, s.date, s.started_at ?? now, s.completed_at ?? null, s.training_started_at ?? null, s.training_ended_at ?? null]
+      );
+    }
+
+    for (const log of payload.set_logs) {
+      db.run(
+        `INSERT INTO set_logs
+           (id, session_id, exercise_config_id, set_number, weight_used, reps_done, exercise_name, muscle_group, completed_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          log.id, log.session_id, log.exercise_config_id, log.set_number, log.weight_used ?? 0,
+          log.reps_done ?? 0, log.exercise_name ?? null, log.muscle_group ?? null, log.completed_at ?? now,
+        ]
+      );
+    }
+
+    for (const change of payload.weight_changes) {
+      db.run(
+        `INSERT INTO weight_changes
+           (id, exercise_config_id, old_weight, new_weight, changed_at)
+         VALUES (?, ?, ?, ?, ?)`,
+        [change.id, change.exercise_config_id, change.old_weight ?? 0, change.new_weight ?? 0, change.changed_at ?? now]
+      );
+    }
+
+    db.run('COMMIT');
+  } catch (err) {
+    try { db.run('ROLLBACK'); } catch (_) {}
+    throw err;
+  }
+  saveDb();
+}
+
 module.exports = {
   initDatabase,
   saveDb,
@@ -293,4 +399,6 @@ module.exports = {
   getCompletedSetCount,
   updateWeight,
   getWeightHistory,
+  exportAll,
+  importAll,
 };

@@ -2,48 +2,68 @@
 
 ## 项目简介
 
-MyWorkOut 是一款 Windows 桌面健身日志应用，基于 Electron + React + TypeScript 构建，以"周"为时间单位管理个人健身记录。
+MyWorkOut 是一款个人健身日志应用，当前主要形态是部署在 GitHub Pages 上的 PWA：
+iPhone Safari 打开后选择「添加到主屏幕」，日常使用体验接近原生 App。
 
-## 标准文档路径
+同一套 React 代码保留了 Electron 桌面壳（Windows），但桌面版目前不是发布目标，
+也没有配置安装包打包脚本。新增功能时，以手机 PWA 的体验为准。
 
-所有开发规范和设计文档位于 `docs/` 文件夹，是项目实现的单一事实来源：
+## 在线地址
+
+https://evanll999.github.io/myworkout/
+
+## 启动与验证
+
+```bash
+npm install
+npm run dev        # Vite + Electron 开发模式
+npm run build      # 生产构建（输出 dist/）
+npx tsc --noEmit   # 类型检查（vite build 不做类型检查）
+```
+
+推送到 `master` 后，`.github/workflows/deploy.yml` 会自动构建并发布到 GitHub Pages。
+
+## 数据存储
+
+| 运行方式 | 存储 | 位置 |
+|---|---|---|
+| 手机 PWA / 浏览器 | IndexedDB | 数据库名 `myworkout` |
+| Electron | sql.js + SQLite | `userData/myworkout.db` |
+
+两套后端共用 `src/db/api.ts` 的接口。修改数据结构或查询时，必须同步修改
+`src/db/browser-db.ts` 和 `electron/database.js`。
+
+训练记录只保存在当前设备。备份入口在「我的计划」页底部，支持导出 JSON、
+复制备份内容和导入恢复。
+
+## 标准文档
 
 | 文件 | 用途 |
 |------|------|
-| [docs/requirements.md](docs/requirements.md) | 需求规格说明、功能清单 |
-| [docs/tech-stack.md](docs/tech-stack.md) | 技术栈选型与架构说明 |
-| [docs/design-spec.md](docs/design-spec.md) | UI 设计规范（配色、布局、组件） |
-| [docs/database-schema.md](docs/database-schema.md) | 数据库表结构 |
-| [docs/dev-steps.md](docs/dev-steps.md) | 分阶段执行步骤与验收标准 |
-
-## 开发日志
-
-每次开发会话结束时，在 `dev-log/YYYY-MM-DD.md` 中记录：
-- **已完成**：实际完成的事项
-- **待办**：下一步要做什么
-- **问题/风险**：遇到的阻碍
-
-如果当天文件已存在，追加内容（标时间戳）。
+| [docs/requirements.md](docs/requirements.md) | 需求规格说明 |
+| [docs/tech-stack.md](docs/tech-stack.md) | 技术栈与架构 |
+| [docs/design-spec.md](docs/design-spec.md) | UI 设计规范 |
+| [docs/database-schema.md](docs/database-schema.md) | 数据结构与迁移规则 |
+| [docs/dev-steps.md](docs/dev-steps.md) | 阶段进度与验收标准 |
 
 ## 工作规范
 
-1. **分阶段推进**：严格按照 `docs/dev-steps.md` 中的阶段顺序开发，每个阶段完成后验收通过再进入下一阶段
-2. **先读文档再动手**：开始每个阶段前，阅读对应的标准文档了解规范
-3. **保持简洁**：代码不加多余注释，组件专注于单一职责
-4. **不引入多余依赖**：能用原生 CSS 解决的不加库，能自研的组件不引入第三方
-5. **安全第一**：Electron 使用 contextIsolation + preload 隔离，所有数据库操作走 IPC
+1. **先读文档再动手**：开始一个阶段前，先看对应的标准文档。
+2. **数据安全优先**：动作删除采用归档，不物理删除历史打卡；打卡时保存动作名和
+   肌肉群快照，之后改名不能改写历史。
+3. **PWA 路径不能写死**：资源、Service Worker、manifest 都要跟随
+   `import.meta.env.BASE_URL` 或相对路径，保证部署在 `/myworkout/` 子路径下可用。
+4. **类型检查必须通过**：提交前运行 `npx tsc --noEmit`。
+5. **保持简洁**：代码不加多余注释，组件专注单一职责，能用原生 CSS 就不加依赖。
+6. **安全第一**：Electron 保持 contextIsolation + preload 白名单，所有数据库操作走 IPC。
+7. **记录开发日志**：每次开发会话结束，在 `dev-log/YYYY-MM-DD.md` 记录已完成、待办、风险。
 
 ## 技术要点
 
-- **主进程**：`electron/main.js` — 窗口管理
-- **预加载**：`electron/preload.js` — 安全 IPC 桥接，白名单通道
-- **渲染进程**：`src/` — React 前端
-- **数据库**：`electron/database.js` — better-sqlite3 操作封装（阶段 1 创建）
-- **样式**：CSS 变量定义在 `src/styles/global.css`，主色 `--primary: #5B9BD5`
-
-## 启动命令
-
-```bash
-npm run dev    # 启动 Vite dev server + Electron 窗口
-npm run build  # 构建生产版本
-```
+- 渲染进程：`src/`，React 18 + TypeScript + Vite
+- 主进程：`electron/main.js`，窗口管理与 IPC
+- 预加载：`electron/preload.js`，白名单 IPC 桥接
+- 浏览器数据库：`src/db/browser-db.ts`，IndexedDB
+- 桌面数据库：`electron/database.js`，sql.js
+- 样式：`src/styles/global.css`，CSS 变量，主色 `--primary`
+- PWA：`public/sw.js` + `public/manifest.json`，导航请求网络优先、静态资源缓存优先

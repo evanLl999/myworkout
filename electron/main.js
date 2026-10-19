@@ -40,12 +40,12 @@ function safeHandler(fn) {
 }
 
 function registerIpcHandlers() {
-  ipcMain.handle('db:getConfigsByDay', safeHandler((_event, dayOfWeek) => {
-    return db.getConfigsByDay(dayOfWeek);
+  ipcMain.handle('db:getConfigsByDay', safeHandler((_event, dayOfWeek, includeArchived) => {
+    return db.getConfigsByDay(dayOfWeek, includeArchived);
   }));
 
-  ipcMain.handle('db:getAllConfigs', safeHandler(() => {
-    return db.getAllConfigs();
+  ipcMain.handle('db:getAllConfigs', safeHandler((_event, includeArchived) => {
+    return db.getAllConfigs(includeArchived);
   }));
 
   ipcMain.handle('db:addExercise', safeHandler((_event, data) => {
@@ -84,8 +84,8 @@ function registerIpcHandlers() {
     return db.resetSession(sessionId);
   }));
 
-  ipcMain.handle('db:addSetLog', safeHandler((_event, sessionId, exerciseConfigId, setNumber, weightUsed, repsDone) => {
-    return db.addSetLog(sessionId, exerciseConfigId, setNumber, weightUsed, repsDone);
+  ipcMain.handle('db:addSetLog', safeHandler((_event, sessionId, exerciseConfigId, setNumber, weightUsed, repsDone, exerciseName, muscleGroup) => {
+    return db.addSetLog(sessionId, exerciseConfigId, setNumber, weightUsed, repsDone, exerciseName, muscleGroup);
   }));
 
   ipcMain.handle('db:getSetLogs', safeHandler((_event, sessionId) => {
@@ -102,6 +102,14 @@ function registerIpcHandlers() {
 
   ipcMain.handle('db:getWeightHistory', safeHandler((_event, exerciseConfigId) => {
     return db.getWeightHistory(exerciseConfigId);
+  }));
+
+  ipcMain.handle('db:exportAll', safeHandler(() => {
+    return db.exportAll();
+  }));
+
+  ipcMain.handle('db:importAll', safeHandler((_event, payload) => {
+    return db.importAll(payload);
   }));
 }
 

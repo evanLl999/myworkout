@@ -28,6 +28,7 @@ body {
 
 #root {
   min-height: 100vh;
+  min-height: 100dvh;
 }
 
 /* ========== Layout ========== */
@@ -73,7 +74,7 @@ body {
   padding: 20px;
   background: var(--bg);
   overflow-y: auto;
-  padding-bottom: 90px; /* 给底部导航留空间 */
+  padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px)); /* 给底部导航留空间 */
 }
 
 /* ========== Bottom Bar ========== */
@@ -195,6 +196,11 @@ body {
 
 .btn-danger:hover {
   background: #c0392b;
+}
+
+.btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 /* ========== Form ========== */
@@ -338,6 +344,8 @@ select.form-input {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
   margin-bottom: 12px;
 }
 
@@ -374,9 +382,15 @@ select.form-input {
   color: #388E3C;
 }
 
+.tag-archived {
+  background: #EEEEEE;
+  color: #777777;
+}
+
 .exercise-meta {
   display: flex;
   gap: 20px;
+  flex-wrap: wrap;
   font-size: 14px;
   color: var(--text-secondary);
   margin-bottom: 12px;
@@ -386,6 +400,7 @@ select.form-input {
   display: flex;
   align-items: center;
   gap: 12px;
+  flex-wrap: wrap;
 }
 
 /* 当前训练动作 — 绿色高亮 */
@@ -400,15 +415,19 @@ select.form-input {
   background: #fffbfb;
 }
 
+.exercise-card.card-archived {
+  border-style: dashed;
+  background: #fafafa;
+}
+
 /* ========== Rest Timer ========== */
 
 .sticky-timer {
-  position: fixed;
+  position: sticky;
   top: 44px;
-  left: 0;
-  right: 0;
-  z-index: 50;
+  z-index: 40;
   background: var(--bg);
+  margin: 0 -20px 16px;
   padding: 8px 20px;
   border-bottom: 1px solid var(--border);
 }
@@ -538,4 +557,118 @@ select.form-input {
   border-radius: 50%;
   animation: spark-fly 0.8s ease-out forwards;
   box-shadow: 0 0 6px 2px currentColor;
+}
+
+/* ========== Training Bar ========== */
+
+.training-bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
+  padding: 16px;
+  background: var(--white);
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+
+.training-meta {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.text-success {
+  color: var(--success);
+}
+
+.text-primary-strong {
+  color: var(--primary-dark);
+  font-size: 16px;
+}
+
+.btn-reset {
+  margin-left: auto;
+  background: var(--white);
+  border: 1px solid #e74c3c;
+  color: #e74c3c;
+  cursor: pointer;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-family: inherit;
+}
+
+.history-summary {
+  background: #fbfdff;
+}
+
+.loading-text {
+  color: var(--text-secondary);
+  text-align: center;
+  padding: 40px;
+}
+
+/* ========== Error Banner ========== */
+
+.error-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 10px 14px;
+  background: #fff1f0;
+  border: 1px solid #ffccc7;
+  border-radius: 8px;
+  color: #c0392b;
+  font-size: 13px;
+}
+
+.error-banner button {
+  margin-left: auto;
+  border: none;
+  background: transparent;
+  color: #c0392b;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 12px;
+}
+
+/* ========== Backup ========== */
+
+.backup-card {
+  margin-top: 20px;
+}
+
+.backup-card h3 {
+  font-size: 16px;
+  margin-bottom: 8px;
+}
+
+.backup-card p {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+}
+
+.backup-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.backup-note {
+  margin-top: 10px;
+  color: var(--success) !important;
+}
+
+.backup-save-link {
+  margin-top: 10px;
+  text-decoration: none;
+}
+
+.backup-error {
+  margin-top: 10px;
+  color: #c0392b !important;
 }

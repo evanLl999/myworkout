@@ -20,6 +20,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
       'db:getCompletedSetCount',
       'db:updateWeight',
       'db:getWeightHistory',
+      'db:exportAll',
+      'db:importAll',
     ];
     if (allowedChannels.includes(channel)) {
       return ipcRenderer.invoke(channel, ...args);

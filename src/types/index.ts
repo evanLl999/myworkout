@@ -10,8 +10,21 @@ export interface ExerciseConfig {
   sort_order: number;
   image_data: string | null;
   is_required: number;
+  is_archived?: number;
   created_at: string;
   updated_at: string;
+}
+
+export interface NewExerciseInput {
+  day_of_week: number;
+  muscle_group: string;
+  exercise_name: string;
+  default_weight: number;
+  target_sets: number;
+  target_reps: number;
+  sort_order?: number;
+  image_data?: string | null;
+  is_required?: number | boolean;
 }
 
 // 训练会话
@@ -33,7 +46,11 @@ export interface SetLog {
   weight_used: number;
   reps_done: number;
   completed_at: string;
+  exercise_name?: string | null;
+  muscle_group?: string | null;
 }
+
+export type SetLogWithMeta = SetLog & { exercise_name: string; muscle_group: string };
 
 // 重量变更记录
 export interface WeightChange {
@@ -42,4 +59,14 @@ export interface WeightChange {
   old_weight: number;
   new_weight: number;
   changed_at: string;
+}
+
+export interface BackupData {
+  app?: string;
+  version?: number;
+  exported_at?: string;
+  configs: ExerciseConfig[];
+  sessions: WorkoutSession[];
+  set_logs: SetLog[];
+  weight_changes: WeightChange[];
 }

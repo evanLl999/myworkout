@@ -1,12 +1,14 @@
 {
   "name": "myworkout",
   "version": "1.0.0",
-  "description": "个人健身日志桌面应用",
+  "description": "个人健身日志 PWA / Electron 应用",
   "main": "electron/main.js",
   "scripts": {
     "dev": "concurrently \"vite\" \"wait-on http://localhost:5173 && electron .\"",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "check": "tsc --noEmit && vite build"
   },
   "keywords": [],
   "author": "",

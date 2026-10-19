@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
-import type { ExerciseConfig, WorkoutSession, SetLog } from '../types';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import type { ExerciseConfig, WorkoutSession, SetLogWithMeta } from '../types';
 import * as api from '../db/api';
 import WeekNavigator from '../components/WeekNavigator';
 import DayCards from '../components/DayCards';
@@ -7,37 +7,18 @@ import CalendarPicker from '../components/CalendarPicker';
 import ExerciseTracker from '../components/ExerciseTracker';
 import RestTimer from '../components/RestTimer';
 import Fireworks from '../components/Fireworks';
+import {
+  diffSeconds,
+  formatDate,
+  formatDuration,
+  formatTime,
+  getMonday,
+  parseDate,
+  parseTimestamp,
+} from '../utils/date';
 
-function getMonday(date: Date): Date {
-  const d = new Date(date);
-  const day = d.getDay();
-  const diff = day === 0 ? -6 : 1 - day;
-  d.setDate(d.getDate() + diff);
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
-
-function formatDate(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-}
-
-function formatTime(isoStr: string): string {
-  const d = new Date(isoStr);
-  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-}
-
-function formatDuration(seconds: number): string {
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  if (h > 0) return `${h}h ${m}m`;
-  return `${m}m`;
-}
-
-function diffSeconds(start: string, end: string): number {
-  return Math.floor((new Date(end).getTime() - new Date(start).getTime()) / 1000);
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : '操作失败，请稍后重试';
 }
 
 export default function WorkoutLog() {
@@ -48,132 +29,186 @@ export default function WorkoutLog() {
 
   const [exercises, setExercises] = useState<ExerciseConfig[]>([]);
   const [session, setSession] = useState<WorkoutSession | null>(null);
-  const [setLogs, setSetLogs] = useState<(SetLog & { exercise_name: string; muscle_group: string })[]>([]);
+  const [setLogs, setSetLogs] = useState<SetLogWithMeta[]>([]);
   const [loading, setLoading] = useState(true);
   const [showFireworks, setShowFireworks] = useState(false);
+  const [error, setError] = useState('');
+  const loadSeq = useRef(0);
 
   const isToday = selectedDate === today;
   const isFutureDate = selectedDate > today;
+  const activeExercises = exercises.filter((ex) => !ex.is_archived);
   const isPastEmpty = selectedDate < today && setLogs.length === 0 && !loading;
   const isFutureEmpty = isFutureDate && !loading;
-  const isTodayEmpty = isToday && exercises.length === 0 && !loading;
+  const isTodayEmpty = isToday && activeExercises.length === 0 && setLogs.length === 0 && !loading;
 
   const hasTrainingStarted = !!session?.training_started_at;
   const hasTrainingEnded = !!session?.training_ended_at;
 
-  // 只有必练动作完成才算计划完成
-  const requiredExercises = exercises.filter((ex) => ex.is_required);
+  // 只有当前计划里的必练动作完成才算计划完成，已归档动作不参与
+  const requiredExercises = activeExercises.filter((ex) => ex.is_required);
   const allCompleted = isToday && requiredExercises.length > 0 && requiredExercises.every((ex) => {
     const completed = setLogs.filter((sl) => sl.exercise_config_id === ex.id).length;
     return completed >= ex.target_sets;
   });
 
-  // 最后一组打卡的时间
   const lastSetTime = setLogs.length > 0
     ? setLogs.reduce((latest, log) =>
-        log.completed_at > latest ? log.completed_at : latest, setLogs[0].completed_at)
+        parseTimestamp(log.completed_at) > parseTimestamp(latest) ? log.completed_at : latest,
+        setLogs[0].completed_at)
     : null;
 
-  // 休息计时：开始训练就有（用训练开始时间或最后打卡时间）
-  const showRestTimer = hasTrainingStarted && !allCompleted && !hasTrainingEnded;
-  const lastCheckInTime = showRestTimer
+  const lastCheckInTime = isToday && hasTrainingStarted && !hasTrainingEnded
     ? (lastSetTime || session?.training_started_at || null)
     : null;
 
   const loadDay = useCallback(async (date: string) => {
+    const seq = ++loadSeq.current;
     setLoading(true);
-    const dayOfWeek = new Date(date).getDay();
-    const dow = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+    setError('');
+    const dow = parseDate(date).getDay();
+    const dayOfWeek = dow === 0 ? 6 : dow - 1;
 
-    const [configs, sess] = await Promise.all([
-      api.getConfigsByDay(dow),
-      api.getOrCreateSession(date),
-    ]);
+    try {
+      const [configs, existingSession] = await Promise.all([
+        api.getConfigsByDay(dayOfWeek, true),
+        api.getSessionByDate(date),
+      ]);
+      if (seq !== loadSeq.current) return;
 
-    setExercises(configs);
-    setSession(sess);
+      const sess = existingSession || (date === formatDate(new Date()) ? await api.getOrCreateSession(date) : null);
+      if (seq !== loadSeq.current) return;
 
-    if (sess) {
-      const logs = await api.getSetLogs(sess.id);
+      const logs = sess ? await api.getSetLogs(sess.id) : [];
+      if (seq !== loadSeq.current) return;
+
+      // 显示当前动作；已归档动作只在当天有打卡记录时显示，避免丢掉历史
+      const visibleExercises = configs.filter(
+        (config) => !config.is_archived || logs.some((log) => log.exercise_config_id === config.id)
+      );
+
+      setExercises(visibleExercises);
+      setSession(sess);
       setSetLogs(logs);
-    } else {
-      setSetLogs([]);
+    } catch (err) {
+      if (seq === loadSeq.current) setError(errorMessage(err));
+    } finally {
+      if (seq === loadSeq.current) setLoading(false);
     }
-
-    setLoading(false);
   }, []);
 
   useEffect(() => {
     loadDay(selectedDate);
   }, [selectedDate, loadDay]);
 
-  // 必练动作完成时自动标记 session 完成
+  // 必练动作完成时自动标记 session 完成（只处理今天）
   useEffect(() => {
-    if (!session || exercises.length === 0) return;
-    const required = exercises.filter((ex) => ex.is_required);
+    if (!isToday || !session || activeExercises.length === 0) return;
+    const required = activeExercises.filter((ex) => ex.is_required);
     if (required.length === 0) return;
     const allDone = required.every((ex) => {
       const completed = setLogs.filter((sl) => sl.exercise_config_id === ex.id).length;
       return completed >= ex.target_sets;
     });
     if (allDone && !session.completed_at) {
-      api.completeSession(session.id);
+      api.completeSession(session.id).catch((err) => setError(errorMessage(err)));
       setSession({ ...session, completed_at: new Date().toISOString() });
       setShowFireworks(true);
     }
-  }, [setLogs, exercises, session]);
+  }, [setLogs, exercises, session, isToday]);
 
   async function handleStartTraining() {
     if (!session) return;
-    const updated = await api.startTraining(session.id);
-    setSession(updated);
+    try {
+      const updated = await api.startTraining(session.id);
+      setSession(updated);
+    } catch (err) {
+      setError(errorMessage(err));
+    }
   }
 
   async function handleEndTraining() {
     if (!session) return;
-    const updated = await api.endTraining(session.id);
-    setSession(updated);
-    setShowFireworks(true);
+    if (!allCompleted && !confirm('还有未完成的动作，确定结束本次训练吗？')) return;
+    try {
+      const updated = await api.endTraining(session.id);
+      setSession(updated);
+      if (allCompleted) setShowFireworks(true);
+    } catch (err) {
+      setError(errorMessage(err));
+    }
   }
 
   async function handleReset() {
     if (!session) return;
     if (!confirm('确定要重置今天的训练记录吗？所有打卡数据将被清除。')) return;
-    await api.resetSession(session.id);
-    setSession(null);
-    setSetLogs([]);
-    loadDay(selectedDate);
+    try {
+      await api.resetSession(session.id);
+      await loadDay(selectedDate);
+      setShowFireworks(false);
+    } catch (err) {
+      setError(errorMessage(err));
+    }
   }
 
   async function handleCheckIn(configId: number, weight: number, setNumber: number) {
     if (!session) return;
-    await api.addSetLog(session.id, configId, setNumber, weight, exercises.find(e => e.id === configId)?.target_reps ?? 0);
-    const logs = await api.getSetLogs(session.id);
-    setSetLogs(logs);
+    const exercise = exercises.find((ex) => ex.id === configId);
+    if (!exercise) return;
+    try {
+      let activeSession = session;
+      // 直接点“完成一组”时自动开始训练，避免出现没有开始时间的记录
+      if (!activeSession.training_started_at) {
+        const started = await api.startTraining(activeSession.id);
+        if (started) {
+          activeSession = started;
+          setSession(started);
+        }
+      }
+      await api.addSetLog(
+        activeSession.id,
+        configId,
+        setNumber,
+        weight,
+        exercise.target_reps,
+        exercise.exercise_name,
+        exercise.muscle_group
+      );
+      const logs = await api.getSetLogs(activeSession.id);
+      setSetLogs(logs);
+    } catch (err) {
+      setError(errorMessage(err));
+    }
   }
 
   async function handleWeightChange(configId: number, newWeight: number) {
-    await api.updateWeight(configId, newWeight);
+    try {
+      await api.updateWeight(configId, newWeight);
+      setExercises((prev) =>
+        prev.map((ex) => (ex.id === configId ? { ...ex, default_weight: newWeight } : ex))
+      );
+    } catch (err) {
+      setError(errorMessage(err));
+    }
   }
 
-  function handlePrevWeek() {
-    const d = new Date(weekStart);
-    d.setDate(d.getDate() - 7);
-    setWeekStart(d);
-  }
-
-  function handleNextWeek() {
-    const d = new Date(weekStart);
-    d.setDate(d.getDate() + 7);
-    setWeekStart(d);
+  function shiftWeek(days: number) {
+    const nextWeek = new Date(weekStart);
+    nextWeek.setDate(nextWeek.getDate() + days);
+    setWeekStart(nextWeek);
+    const selected = parseDate(selectedDate);
+    const weekEnd = new Date(nextWeek);
+    weekEnd.setDate(weekEnd.getDate() + 6);
+    if (selected < nextWeek || selected > weekEnd) {
+      setSelectedDate(formatDate(nextWeek));
+    }
   }
 
   function handleCalendarSelect(date: string) {
-    setWeekStart(getMonday(new Date(date)));
+    setWeekStart(getMonday(parseDate(date)));
     setSelectedDate(date);
   }
 
-  // ========== 时间统计 ==========
   const planDuration = (session?.training_started_at && lastSetTime)
     ? diffSeconds(session.training_started_at, lastSetTime)
     : 0;
@@ -190,8 +225,8 @@ export default function WorkoutLog() {
 
       <WeekNavigator
         weekStart={weekStart}
-        onPrev={handlePrevWeek}
-        onNext={handleNextWeek}
+        onPrev={() => shiftWeek(-7)}
+        onNext={() => shiftWeek(7)}
         onCalendarClick={() => setShowCalendar(true)}
       />
 
@@ -200,6 +235,13 @@ export default function WorkoutLog() {
         selectedDate={selectedDate}
         onSelect={setSelectedDate}
       />
+
+      {error && (
+        <div className="error-banner" role="alert">
+          {error}
+          <button type="button" onClick={() => setError('')}>关闭</button>
+        </div>
+      )}
 
       {/* 过去未训练 — 空状态 */}
       {isPastEmpty && (
@@ -216,79 +258,76 @@ export default function WorkoutLog() {
       )}
 
       {/* 开始/结束训练 控制栏 */}
-      {isToday && (
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 16, marginBottom: 16,
-          padding: 16, background: 'var(--white)', borderRadius: 10,
-          border: '1px solid var(--border)', flexWrap: 'wrap',
-        }}>
-          {/* 开始训练 */}
+      {isToday && !isTodayEmpty && (
+        <div className="training-bar">
           {!hasTrainingStarted && !hasTrainingEnded && (
             <button className="btn btn-primary" onClick={handleStartTraining}>
               开始训练
             </button>
           )}
 
-          {/* 已开始 */}
-          {(hasTrainingStarted || hasTrainingEnded) && session?.training_started_at && (
-            <span style={{ fontSize: 14, color: 'var(--text-secondary)' }}>
-              开始时间: <strong style={{ color: 'var(--text)' }}>{formatTime(session.training_started_at)}</strong>
+          {session?.training_started_at && (
+            <span className="training-meta">
+              开始时间: <strong>{formatTime(session.training_started_at)}</strong>
             </span>
           )}
 
-          {/* 计划完成 — 显示计划用时 */}
           {allCompleted && planDuration > 0 && (
-            <span style={{ fontSize: 14, color: 'var(--text-secondary)' }}>
-              计划用时: <strong style={{ color: 'var(--success)' }}>{formatDuration(planDuration)}</strong>
+            <span className="training-meta">
+              计划用时: <strong className="text-success">{formatDuration(planDuration)}</strong>
             </span>
           )}
 
-          {/* 结束训练按钮 — 计划完成后才显示 */}
-          {allCompleted && !hasTrainingEnded && (
-            <button className="btn btn-primary" onClick={handleEndTraining}>
+          {hasTrainingStarted && !hasTrainingEnded && (
+            <button className="btn btn-outline" onClick={handleEndTraining}>
               结束训练
             </button>
           )}
 
-          {/* 额外用时 */}
           {hasTrainingEnded && extraDuration > 0 && (
-            <span style={{ fontSize: 14, color: 'var(--text-secondary)' }}>
+            <span className="training-meta">
               额外用时: <strong>{formatDuration(extraDuration)}</strong>
             </span>
           )}
 
-          {/* 总用时 */}
           {hasTrainingEnded && totalDuration > 0 && (
-            <span style={{ fontSize: 14, color: 'var(--text-secondary)' }}>
-              总用时: <strong style={{ color: 'var(--primary-dark)', fontSize: 16 }}>
-                {formatDuration(totalDuration)}
-              </strong>
+            <span className="training-meta">
+              总用时: <strong className="text-primary-strong">{formatDuration(totalDuration)}</strong>
             </span>
           )}
 
-          {/* 重置 */}
-          <button
-            onClick={handleReset}
-            style={{
-              marginLeft: 'auto', background: 'var(--white)', border: '1px solid #e74c3c',
-              color: '#e74c3c', cursor: 'pointer',
-              fontSize: 11, padding: '2px 8px', borderRadius: 4, fontFamily: 'inherit',
-            }}
-          >重置</button>
+          <button type="button" className="btn-reset" onClick={handleReset}>
+            重置
+          </button>
+        </div>
+      )}
+
+      {/* 历史日期的训练摘要 */}
+      {!isToday && session?.training_started_at && !isPastEmpty && (
+        <div className="training-bar history-summary">
+          <span className="training-meta">开始: <strong>{formatTime(session.training_started_at)}</strong></span>
+          {session.training_ended_at && (
+            <span className="training-meta">结束: <strong>{formatTime(session.training_ended_at)}</strong></span>
+          )}
+          {totalDuration > 0 && (
+            <span className="training-meta">
+              总用时: <strong className="text-primary-strong">{formatDuration(totalDuration)}</strong>
+            </span>
+          )}
         </div>
       )}
 
       {/* 正常训练内容（非空状态时显示） */}
       {!(isPastEmpty || isFutureEmpty || isTodayEmpty) && (
         <>
-          {hasTrainingStarted && (
-            <div className="sticky-timer" style={{ marginBottom: 16, paddingTop: 8, paddingBottom: 8 }}>
-              <RestTimer lastCheckInTime={lastCheckInTime} isComplete={allCompleted || hasTrainingEnded} />
+          {isToday && hasTrainingStarted && !hasTrainingEnded && (
+            <div className="sticky-timer">
+              <RestTimer lastCheckInTime={lastCheckInTime} isComplete={allCompleted} />
             </div>
           )}
 
           {loading ? (
-            <p style={{ color: 'var(--text-secondary)', textAlign: 'center', padding: 40 }}>加载中...</p>
+            <p className="loading-text">加载中...</p>
           ) : (
             <ExerciseTracker
               sessionId={session?.id ?? 0}
@@ -297,7 +336,8 @@ export default function WorkoutLog() {
               lastCheckInTime={lastCheckInTime}
               onCheckIn={handleCheckIn}
               onWeightChange={handleWeightChange}
-              isToday={isToday && !hasTrainingEnded}
+              isToday={isToday}
+              readOnly={hasTrainingEnded}
             />
           )}
         </>

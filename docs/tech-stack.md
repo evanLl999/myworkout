@@ -1,21 +1,55 @@
-# 技术栈
+# 技术栈与架构
 
-| 层 | 选择 | 版本 | 原因 |
-|---|---|---|---|
-| 桌面框架 | Electron | 42.x | 成熟稳定，Windows 支持好，后续可跨平台 |
-| 前端框架 | React | 18.x | 组件化开发，生态丰富 |
-| 语言 | TypeScript | 5.x | 类型安全，减少运行时错误 |
-| 构建工具 | Vite | 6.x | 开发启动快，HMR 体验好 |
-| 数据库 | sql.js | 1.x | SQLite 的 WebAssembly 版本，无需编译，纯 JS 运行 |
-| 样式 | CSS 变量 | - | 无额外依赖，维护简单 |
+## 技术栈
 
-## 架构说明
+| 层 | 选择 | 说明 |
+|---|---|---|
+| 前端框架 | React 18 + TypeScript | 组件化，类型检查 |
+| 构建工具 | Vite | 开发热更新，生产构建 |
+| 手机端 | PWA | GitHub Pages 托管，添加到主屏幕 |
+| 浏览器存储 | IndexedDB | 无后端，数据留在本机 |
+| 桌面壳 | Electron 42 | 保留的 Windows 运行方式，非当前发布目标 |
+| 桌面存储 | sql.js | SQLite 的 WebAssembly 版本，无需编译 |
+| 样式 | 原生 CSS 变量 | 不引入 UI 库 |
 
-- **主进程** (`electron/main.js`)：窗口管理 + 数据库操作
-- **预加载** (`electron/preload.js`)：安全 IPC 桥接层
-- **渲染进程** (`src/`)：React UI，通过 `window.electronAPI` 调用主进程
+## 运行形态
 
-## 待定项
+### 手机 PWA（主要）
 
-- 手机端方案：React Native 或 PWA（后续评估）
-- 打包工具：electron-builder（阶段 7 引入）
+- 线上地址：`https://evanll999.github.io/myworkout/`
+- 首次打开后通过 Safari「分享 → 添加到主屏幕」
+- `public/manifest.json` 提供应用名称、图标和独立窗口模式
+- `public/sw.js` 提供离线缓存和自动更新
+- 数据保存在当前浏览器的 IndexedDB，不上传服务器
+
+### Electron（保留）
+
+- `electron/main.js` 负责窗口和 IPC
+- `electron/preload.js` 暴露白名单通道
+- `electron/database.js` 使用 sql.js 读写 `userData/myworkout.db`
+
+## 数据访问层
+
+`src/db/api.ts` 是前端统一入口：
+
+- 检测到 `window.electronAPI` 时通过 IPC 调用主进程
+- 否则调用 `src/db/browser-db.ts` 的 IndexedDB 实现
+
+新增数据库操作时，两套实现和 `preload.js` 白名单要一起更新。
+
+## 部署
+
+`.github/workflows/deploy.yml` 在推送到 `master` 后执行：
+
+1. `npm ci`
+2. `npm run build`
+3. 上传 `dist/` 到 GitHub Pages
+
+Vite 使用 `base: './'`，所有资源必须使用相对路径或 `import.meta.env.BASE_URL`，
+否则会部署到子路径 `/myworkout/` 时 404。
+
+## 已知限制
+
+- 没有账号和云同步，换设备需要手动导出/导入备份
+- 数据清理、浏览器重装会导致本机记录丢失
+- Electron 尚未配置 electron-builder，不能直接生成 exe

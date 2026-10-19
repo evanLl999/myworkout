@@ -34,6 +34,8 @@ export default function DayConfig() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState<ExerciseFormData>(EMPTY_FORM);
   const [enlargedImage, setEnlargedImage] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const formRef = useRef<HTMLDivElement>(null);
 
@@ -76,8 +78,16 @@ export default function DayConfig() {
   }
 
   async function handleDelete(id: number) {
-    await api.deleteExercise(id);
-    await loadExercises(selectedDay);
+    const target = exercises.find((ex) => ex.id === id);
+    const name = target?.exercise_name ?? '这个动作';
+    if (!confirm(`确定删除「${name}」吗？\n\n动作会从计划中移除，但历史打卡记录会保留。`)) return;
+    setError('');
+    try {
+      await api.deleteExercise(id);
+      await loadExercises(selectedDay);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '删除失败');
+    }
   }
 
   async function handleSave() {
@@ -91,26 +101,40 @@ export default function DayConfig() {
       target_reps: parseInt(form.target_reps) || 1,
       sort_order: parseInt(form.sort_order) || 0,
       image_data: form.image_data,
-      is_required: form.is_required,
+      is_required: form.is_required ? 1 : 0,
     };
 
-    if (editingId) {
-      await api.updateExercise(editingId, data);
-    } else {
-      await api.addExercise({ ...data, day_of_week: selectedDay });
+    setSaving(true);
+    setError('');
+    try {
+      if (editingId) {
+        await api.updateExercise(editingId, data);
+      } else {
+        await api.addExercise({ ...data, day_of_week: selectedDay });
+      }
+      setShowForm(false);
+      await loadExercises(selectedDay);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '保存失败');
+    } finally {
+      setSaving(false);
     }
-    setShowForm(false);
-    await loadExercises(selectedDay);
   }
 
-  function handleImagePick(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleImagePick(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      setForm({ ...form, image_data: reader.result as string });
-    };
-    reader.readAsDataURL(file);
+    if (file.size > 15 * 1024 * 1024) {
+      setError('图片太大了，请选择 15MB 以内的图片');
+      return;
+    }
+    try {
+      const compressed = await compressImage(file);
+      setForm((prev) => ({ ...prev, image_data: compressed }));
+      setError('');
+    } catch {
+      setError('图片处理失败，请换一张试试');
+    }
   }
 
   function handleRemoveImage() {
@@ -125,6 +149,13 @@ export default function DayConfig() {
 
   return (
     <div>
+      {error && (
+        <div className="error-banner" role="alert">
+          {error}
+          <button type="button" onClick={() => setError('')}>关闭</button>
+        </div>
+      )}
+
       <div className="tabs">
         {DAY_NAMES.map((name, i) => (
           <button
@@ -268,8 +299,8 @@ export default function DayConfig() {
             </div>
           </div>
           <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
-            <button type="button" className="btn btn-primary" onClick={handleSave}>
-              {editingId ? '保存修改' : '添加'}
+            <button type="button" className="btn btn-primary" onClick={handleSave} disabled={saving}>
+              {saving ? '保存中...' : editingId ? '保存修改' : '添加'}
             </button>
             <button type="button" className="btn btn-outline" onClick={() => setShowForm(false)}>取消</button>
           </div>
@@ -289,4 +320,33 @@ export default function DayConfig() {
       )}
     </div>
   );
+}
+
+function compressImage(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const maxSize = 900;
+        const scale = Math.min(1, maxSize / Math.max(img.width, img.height));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(img.width * scale));
+        canvas.height = Math.max(1, Math.round(img.height * scale));
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          reject(new Error('无法处理图片'));
+          return;
+        }
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/jpeg', 0.75));
+      };
+      img.onerror = () => reject(new Error('图片读取失败'));
+      img.src = reader.result as string;
+    };
+    reader.onerror = () => reject(new Error('图片读取失败'));
+    reader.readAsDataURL(file);
+  });
 }

@@ -6,11 +6,12 @@ interface Props {
 }
 
 function getWeekLabel(monday: Date) {
-  const year = monday.getFullYear();
-  const jan1 = new Date(year, 0, 1);
-  const dayOfYear = Math.floor((monday.getTime() - jan1.getTime()) / 86400000);
-  const weekNum = Math.ceil((dayOfYear + jan1.getDay()) / 7) || 1;
-  return `${year}年第${weekNum}周`;
+  const d = new Date(Date.UTC(monday.getFullYear(), monday.getMonth(), monday.getDate()));
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  const weekNum = Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+  return `${d.getUTCFullYear()}年第${weekNum}周`;
 }
 
 export default function WeekNavigator({ weekStart, onPrev, onNext, onCalendarClick }: Props) {

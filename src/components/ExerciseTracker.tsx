@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import type { ExerciseConfig } from '../types';
+import type { ExerciseConfig, SetLogWithMeta } from '../types';
 import SetProgress from './SetProgress';
 
 interface Spark {
@@ -14,17 +14,18 @@ interface Spark {
 interface Props {
   sessionId: number;
   exercises: ExerciseConfig[];
-  setLogs: { exercise_config_id: number; completed_at: string }[];
+  setLogs: SetLogWithMeta[];
   lastCheckInTime: string | null;
   onCheckIn: (configId: number, weight: number, setNumber: number) => void;
   onWeightChange: (configId: number, newWeight: number) => void;
   isToday: boolean;
+  readOnly?: boolean;
 }
 
 const SPARK_COLORS = ['#FF6B35', '#FFD700', '#FF4500', '#FFA500', '#FFE55C', '#FF4136', '#F012BE'];
 
 export default function ExerciseTracker({
-  sessionId, exercises, setLogs, lastCheckInTime, onCheckIn, onWeightChange, isToday,
+  sessionId, exercises, setLogs, lastCheckInTime, onCheckIn, onWeightChange, isToday, readOnly = false,
 }: Props) {
   const [weights, setWeights] = useState<Record<number, number>>({});
   const [enlargedImage, setEnlargedImage] = useState<string | null>(null);
@@ -33,8 +34,8 @@ export default function ExerciseTracker({
   const exerciseRefs = useRef<Record<number, HTMLDivElement | null>>({});
 
   // 当前正在训练的动作（第一个未完成的必练）
-  const currentExerciseId = isToday
-    ? exercises.find((ex) => ex.is_required && getCompletedSets(ex.id) < ex.target_sets)?.id ?? null
+  const currentExerciseId = isToday && !readOnly
+    ? exercises.find((ex) => !ex.is_archived && ex.is_required && getCompletedSets(ex.id) < ex.target_sets)?.id ?? null
     : null;
 
   // 自动滚动到当前训练动作
@@ -109,11 +110,13 @@ export default function ExerciseTracker({
           const completed = getCompletedSets(ex.id);
           const allDone = completed >= ex.target_sets;
           const isCurrent = ex.id === currentExerciseId;
-          const isUnfinished = ex.is_required && !allDone && !isCurrent && isToday;
+          const canEdit = isToday && !readOnly && !ex.is_archived;
+          const isUnfinished = canEdit && ex.is_required && !allDone && !isCurrent;
           const cardClass = [
             'exercise-card',
             isCurrent ? 'card-current' : '',
             isUnfinished ? 'card-unfinished' : '',
+            ex.is_archived ? 'card-archived' : '',
           ].filter(Boolean).join(' ');
           return (
             <div key={ex.id}
@@ -136,6 +139,7 @@ export default function ExerciseTracker({
                       <span className={`tag ${ex.is_required ? 'tag-required' : 'tag-optional'}`}>
                         {ex.is_required ? '必练 *' : '选练'}
                       </span>
+                      {!!ex.is_archived && <span className="tag tag-archived">已删除</span>}
                       {allDone && (
                         <span style={{ marginLeft: 8, color: 'var(--success)', fontSize: 13, fontWeight: 600 }}>
                           ✓ 完成
@@ -146,7 +150,7 @@ export default function ExerciseTracker({
                   </div>
                   <div className="exercise-meta">
                     <span>目标: {ex.target_sets} 组 × {ex.target_reps} 次</span>
-                    {isToday && (
+                    {canEdit && (
                       <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                         重量:
                         <button className="btn btn-outline btn-sm"
@@ -165,10 +169,13 @@ export default function ExerciseTracker({
                     {!isToday && (
                       <span>历史重量: {ex.default_weight} kg</span>
                     )}
+                    {isToday && !canEdit && (
+                      <span>重量: {ex.default_weight} kg</span>
+                    )}
                   </div>
                   <div className="exercise-actions">
                     <SetProgress completed={completed} total={ex.target_sets} />
-                    {isToday && !allDone && (
+                    {canEdit && !allDone && (
                       <button className="btn btn-primary btn-sm"
                         onClick={(e) => handleCheckInClick(ex.id, weights[ex.id] ?? ex.default_weight, completed + 1, e)}
                       >
@@ -195,7 +202,7 @@ export default function ExerciseTracker({
                           }
                           return (
                             <div key={i}>
-                              第{i + 1}组: {time}{interval}
+                              第{log.set_number}组: {time}{interval}
                             </div>
                           );
                         });
