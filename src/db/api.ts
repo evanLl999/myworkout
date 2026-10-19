@@ -174,6 +174,16 @@ export async function saveWeightGoal(goal: number | null): Promise<void> {
   return browserDB.saveWeightGoal(goal);
 }
 
+export async function getWeightGoalVisible(): Promise<boolean> {
+  if (isElectron) return invoke<boolean>('db:getWeightGoalVisible');
+  return browserDB.getWeightGoalVisible();
+}
+
+export async function saveWeightGoalVisible(visible: boolean): Promise<void> {
+  if (isElectron) return invoke<void>('db:saveWeightGoalVisible', visible);
+  return browserDB.saveWeightGoalVisible(visible);
+}
+
 // ========== 膳食计划 ==========
 
 export async function getNutritionPlan(): Promise<NutritionPlanWithItems | null> {

@@ -117,7 +117,8 @@
 | key | string | 主键，如 `weight_goal` |
 | value | string | 值，字符串存储 |
 
-目前用于保存目标体重。目标线显示在体重趋势图上，并包含在备份中。
+目前用于保存 `weight_goal`（目标体重）和 `weight_goal_visible`（目标线显示开关）。
+两项设置都包含在备份中。
 
 ## 备份格式
 

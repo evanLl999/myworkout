@@ -2287,6 +2287,52 @@ textarea {
   color: rgba(255, 255, 255, 0.4);
 }
 
+.weight-goal-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.goal-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.42);
+  font-size: 9px;
+  cursor: pointer;
+}
+
+.switch-track {
+  position: relative;
+  width: 32px;
+  height: 18px;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.14);
+  transition: background 0.2s;
+}
+
+.switch-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.2s;
+}
+
+.goal-switch.is-on .switch-track {
+  background: var(--success);
+}
+
+.goal-switch.is-on .switch-thumb {
+  transform: translateX(14px);
+}
+
 .chart-link {
   border: none;
   background: transparent;

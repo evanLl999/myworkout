@@ -124,6 +124,14 @@ function registerIpcHandlers() {
     return db.saveWeightGoal(goal);
   }));
 
+  ipcMain.handle('db:getWeightGoalVisible', safeHandler(() => {
+    return db.getWeightGoalVisible();
+  }));
+
+  ipcMain.handle('db:saveWeightGoalVisible', safeHandler((_event, visible) => {
+    return db.saveWeightGoalVisible(visible);
+  }));
+
   ipcMain.handle('db:getNutritionPlan', safeHandler(() => {
     return db.getNutritionPlan();
   }));

@@ -98,17 +98,20 @@ export default function WeightPage() {
   const [goalSheetOpen, setGoalSheetOpen] = useState(false);
   const [editing, setEditing] = useState<WeightLog | null>(null);
   const [goal, setGoal] = useState<number | null>(null);
+  const [showGoal, setShowGoal] = useState(true);
   const [error, setError] = useState('');
 
   const loadLogs = useCallback(async () => {
     setLoading(true);
     try {
-      const [weightLogs, weightGoal] = await Promise.all([
+      const [weightLogs, weightGoal, goalVisible] = await Promise.all([
         api.getWeightLogs(),
         api.getWeightGoal(),
+        api.getWeightGoalVisible(),
       ]);
       setLogs(weightLogs);
       setGoal(weightGoal);
+      setShowGoal(goalVisible);
       setError('');
     } catch (err) {
       setError(err instanceof Error ? err.message : '体重记录加载失败');
@@ -162,6 +165,17 @@ export default function WeightPage() {
     setSheetOpen(false);
     setEditing(null);
     await loadLogs();
+  }
+
+  async function toggleGoal() {
+    const next = !showGoal;
+    setShowGoal(next);
+    try {
+      await api.saveWeightGoalVisible(next);
+    } catch (err) {
+      setShowGoal(!next);
+      setError(err instanceof Error ? err.message : '目标线开关保存失败');
+    }
   }
 
   async function handleDelete(log: WeightLog) {
@@ -224,7 +238,7 @@ export default function WeightPage() {
         </div>
         <p className="weight-assessment-message">{assessment.message}</p>
 
-        <WeightChart points={rangePoints} goal={goal} />
+        <WeightChart points={rangePoints} goal={showGoal ? goal : null} />
 
         <div className="chart-range" role="group" aria-label="图表时间范围">
           {[
@@ -247,9 +261,24 @@ export default function WeightPage() {
             <TargetIcon />
             {goal != null ? `目标 ${goal.toFixed(1)} kg` : '未设置目标'}
           </span>
-          <button type="button" className="chart-link" onClick={() => setGoalSheetOpen(true)}>
-            {goal == null ? '设置目标' : '修改目标'}
-          </button>
+          <div className="weight-goal-actions">
+            {goal != null && (
+              <button
+                type="button"
+                className={`goal-switch${showGoal ? ' is-on' : ''}`}
+                role="switch"
+                aria-checked={showGoal}
+                aria-label="显示目标线"
+                onClick={toggleGoal}
+              >
+                <span>目标线</span>
+                <span className="switch-track"><span className="switch-thumb" /></span>
+              </button>
+            )}
+            <button type="button" className="chart-link" onClick={() => setGoalSheetOpen(true)}>
+              {goal == null ? '设置目标' : '修改目标'}
+            </button>
+          </div>
         </div>
         <p className="weight-standard">良好区间：每周下降 0.25–0.75 kg · 仅作趋势参考</p>
       </section>

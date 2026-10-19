@@ -493,6 +493,22 @@ const browserDB = {
     });
   },
 
+  async getWeightGoalVisible(): Promise<boolean> {
+    const db = await openDB();
+    const record = await request<AppSetting | undefined>(
+      store(db, 'app_settings').get('weight_goal_visible') as IDBRequest<AppSetting | undefined>
+    );
+    return record?.value !== '0';
+  },
+
+  async saveWeightGoalVisible(visible: boolean): Promise<void> {
+    const db = await openDB();
+    await putOne(store(db, 'app_settings', 'readwrite'), {
+      key: 'weight_goal_visible',
+      value: visible ? '1' : '0',
+    });
+  },
+
   async getNutritionPlan(): Promise<NutritionPlanWithItems | null> {
     return readNutritionPlan();
   },

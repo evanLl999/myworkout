@@ -396,6 +396,19 @@ function saveWeightGoal(goal) {
   );
 }
 
+function getWeightGoalVisible() {
+  const row = queryOne("SELECT value FROM app_settings WHERE key = 'weight_goal_visible'");
+  return row?.value !== '0';
+}
+
+function saveWeightGoalVisible(visible) {
+  run(
+    `INSERT INTO app_settings (key, value) VALUES ('weight_goal_visible', ?)
+     ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+    [visible ? '1' : '0']
+  );
+}
+
 // ========== 膳食计划 ==========
 
 function getNutritionPlan() {
@@ -630,6 +643,8 @@ module.exports = {
   deleteWeightLog,
   getWeightGoal,
   saveWeightGoal,
+  getWeightGoalVisible,
+  saveWeightGoalVisible,
   getNutritionPlan,
   getNutritionPlans,
   saveNutritionPlan,

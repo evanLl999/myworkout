@@ -25,6 +25,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
       'db:deleteWeightLog',
       'db:getWeightGoal',
       'db:saveWeightGoal',
+      'db:getWeightGoalVisible',
+      'db:saveWeightGoalVisible',
       'db:getNutritionPlan',
       'db:getNutritionPlans',
       'db:saveNutritionPlan',
