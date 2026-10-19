@@ -20,6 +20,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
       'db:getCompletedSetCount',
       'db:updateWeight',
       'db:getWeightHistory',
+      'db:getWeightLogs',
+      'db:saveWeightLog',
+      'db:deleteWeightLog',
+      'db:getNutritionPlan',
+      'db:saveNutritionPlan',
+      'db:ensureNutritionTemplate',
       'db:exportAll',
       'db:importAll',
     ];

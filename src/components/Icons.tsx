@@ -165,3 +165,21 @@ export function SparkleIcon(props: IconProps) {
     </svg>
   );
 }
+
+export function TrendIcon(props: IconProps) {
+  return (
+    <svg {...iconProps(props)}>
+      <path d="M4 17l5-5 3 3 7-8" />
+      <path d="M15 7h4v4" />
+    </svg>
+  );
+}
+
+export function BowlIcon(props: IconProps) {
+  return (
+    <svg {...iconProps(props)}>
+      <path d="M4 11h16a8 8 0 0 1-16 0z" />
+      <path d="M8 7c0-2 1.5-2 1.5-4M12 7c0-2 1.5-2 1.5-4M16 7c0-2 1.5-2 1.5-4" />
+    </svg>
+  );
+}

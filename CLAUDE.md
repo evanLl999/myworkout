@@ -48,6 +48,15 @@ npm run check      # 类型检查 + 生产构建
 训练记录只保存在当前设备。备份入口在「我的计划」页底部，支持导出 JSON、
 复制备份内容和导入恢复。
 
+当前 IndexedDB `DB_VERSION = 2`，在原有 4 个 store 基础上新增：
+
+- `weight_logs`：体重记录（一天一条）
+- `nutrition_plans`：膳食阶段
+- `nutrition_items`：阶段下的每日食材
+
+初始膳食模板在 `src/data/nutrition-template.json`，浏览器和 Electron 共用。
+体重评估使用最近 28 天的线性回归斜率 × 7，每周下降 0.25–0.75 kg 为「良好」。
+
 ## 标准文档
 
 | 文件 | 用途 |
@@ -69,7 +78,8 @@ npm run check      # 类型检查 + 生产构建
 5. **保持简洁**：代码不加多余注释，组件专注单一职责，能用原生 CSS 就不加依赖。
 6. **视觉一致**：新增组件先复用设计令牌和 `Icons.tsx`，不要引入 emoji 图标或第三方 UI 库。
 7. **安全第一**：Electron 保持 contextIsolation + preload 白名单，所有数据库操作走 IPC。
-8. **记录开发日志**：每次开发会话结束，在 `dev-log/YYYY-MM-DD.md` 记录已完成、待办、风险。
+8. **健康数据谨慎表达**：体重评估和膳食模板是趋势参考，不写成医疗诊断或处方。
+9. **记录开发日志**：每次开发会话结束，在 `dev-log/YYYY-MM-DD.md` 记录已完成、待办、风险。
 
 ## 技术要点
 
@@ -82,4 +92,8 @@ npm run check      # 类型检查 + 生产构建
 - 训练状态卡：`src/components/SessionHero.tsx`
 - 图标库：`src/components/Icons.tsx`
 - 添加/编辑抽屉：`src/components/DayConfig.tsx`
+- 体重趋势页：`src/pages/WeightPage.tsx`
+- 体重 SVG 图表：`src/components/WeightChart.tsx`
+- 膳食指南页：`src/pages/NutritionPage.tsx`
+- 膳食模板：`src/data/nutrition-template.json`
 - PWA：`public/sw.js` + `public/manifest.json`，导航请求网络优先、静态资源缓存优先

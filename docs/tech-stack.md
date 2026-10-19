@@ -11,6 +11,7 @@
 | 桌面壳 | Electron 42 | 保留的 Windows 运行方式，非当前发布目标 |
 | 桌面存储 | sql.js | SQLite 的 WebAssembly 版本，无需编译 |
 | 样式 | 原生 CSS 变量 | 不引入 UI 库 |
+| 体重图表 | 原生 SVG | 自绘折线/面积图，不引入图表库 |
 
 ## 运行形态
 
@@ -21,6 +22,7 @@
 - `public/manifest.json` 提供应用名称、图标和独立窗口模式
 - `public/sw.js` 提供离线缓存和自动更新
 - 数据保存在当前浏览器的 IndexedDB，不上传服务器
+- 底部导航包含：训练、体重、饮食、计划
 
 ### Electron（保留）
 
@@ -36,6 +38,18 @@
 - 否则调用 `src/db/browser-db.ts` 的 IndexedDB 实现
 
 新增数据库操作时，两套实现和 `preload.js` 白名单要一起更新。
+
+## 身体数据模型
+
+IndexedDB 当前 `DB_VERSION = 2`，在原有 4 个 store 基础上新增：
+
+- `weight_logs`：体重记录，一天一条
+- `nutrition_plans`：膳食阶段（热量、蛋白质、碳水、脂肪）
+- `nutrition_items`：阶段下的每日食材
+
+初始膳食模板位于 `src/data/nutrition-template.json`，浏览器和 Electron 共用。
+体重趋势与周速度评估在 `src/pages/WeightPage.tsx` 中计算；
+折线图由 `src/components/WeightChart.tsx` 用 SVG 绘制。
 
 ## 部署
 

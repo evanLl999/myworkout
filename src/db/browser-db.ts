@@ -2,14 +2,31 @@ import type {
   BackupData,
   ExerciseConfig,
   NewExerciseInput,
+  NutritionItem,
+  NutritionItemInput,
+  NutritionPlan,
+  NutritionPlanInput,
+  NutritionPlanWithItems,
   SetLog,
   WeightChange,
+  WeightLog,
+  WeightLogInput,
   WorkoutSession,
 } from '../types';
+import nutritionTemplate from '../data/nutrition-template.json';
+import { formatDate } from '../utils/date';
 
 const DB_NAME = 'myworkout';
-const DB_VERSION = 1;
-const STORES = ['exercise_configs', 'workout_sessions', 'set_logs', 'weight_changes'] as const;
+const DB_VERSION = 2;
+const STORES = [
+  'exercise_configs',
+  'workout_sessions',
+  'set_logs',
+  'weight_changes',
+  'weight_logs',
+  'nutrition_plans',
+  'nutrition_items',
+] as const;
 
 type StoreName = typeof STORES[number];
 
@@ -34,6 +51,18 @@ function openDB(): Promise<IDBDatabase> {
       if (!db.objectStoreNames.contains('weight_changes')) {
         const store = db.createObjectStore('weight_changes', { keyPath: 'id', autoIncrement: true });
         store.createIndex('exercise_config_id', 'exercise_config_id');
+      }
+      if (!db.objectStoreNames.contains('weight_logs')) {
+        const store = db.createObjectStore('weight_logs', { keyPath: 'id', autoIncrement: true });
+        store.createIndex('date', 'date', { unique: true });
+      }
+      if (!db.objectStoreNames.contains('nutrition_plans')) {
+        const store = db.createObjectStore('nutrition_plans', { keyPath: 'id', autoIncrement: true });
+        store.createIndex('is_active', 'is_active');
+      }
+      if (!db.objectStoreNames.contains('nutrition_items')) {
+        const store = db.createObjectStore('nutrition_items', { keyPath: 'id', autoIncrement: true });
+        store.createIndex('plan_id', 'plan_id');
       }
     };
     req.onsuccess = () => resolve(req.result);
@@ -74,6 +103,79 @@ function transactionDone(tx: IDBTransaction): Promise<void> {
     tx.onerror = () => reject(tx.error);
     tx.onabort = () => reject(tx.error || new Error('数据库事务已取消'));
   });
+}
+
+async function readNutritionPlan(): Promise<NutritionPlanWithItems | null> {
+  const db = await openDB();
+  const plans = await getAll<NutritionPlan>(store(db, 'nutrition_plans'));
+  if (plans.length === 0) return null;
+  const plan = plans
+    .slice()
+    .sort((a, b) => (b.is_active ?? 0) - (a.is_active ?? 0) || b.id - a.id)[0];
+  const items = await getByIndex<NutritionItem>(store(db, 'nutrition_items'), 'plan_id', plan.id);
+  return {
+    ...plan,
+    items: items.sort((a, b) => a.sort_order - b.sort_order || a.id - b.id),
+  };
+}
+
+async function writeNutritionPlan(
+  input: NutritionPlanInput,
+  items: NutritionItemInput[]
+): Promise<NutritionPlanWithItems> {
+  const db = await openDB();
+  const now = new Date().toISOString();
+  let existing: NutritionPlan | undefined;
+
+  if (input.id) {
+    existing = await request<NutritionPlan | undefined>(
+      store(db, 'nutrition_plans').get(input.id) as IDBRequest<NutritionPlan | undefined>
+    );
+  }
+
+  const planRecord = {
+    name: input.name,
+    start_date: input.start_date,
+    calories: input.calories,
+    protein: input.protein,
+    carbs: input.carbs,
+    fat: input.fat,
+    note: input.note,
+    is_active: 1,
+    created_at: existing?.created_at ?? now,
+    updated_at: now,
+  };
+
+  let planId: number;
+  if (existing) {
+    planId = existing.id;
+    await putOne(store(db, 'nutrition_plans', 'readwrite'), { ...existing, ...planRecord });
+  } else {
+    planId = Number(await request(store(db, 'nutrition_plans', 'readwrite').add(planRecord)));
+  }
+
+  const oldItems = await getByIndex<NutritionItem>(store(db, 'nutrition_items'), 'plan_id', planId);
+  const deleteStore = store(db, 'nutrition_items', 'readwrite');
+  await Promise.all(oldItems.map((item) => deleteOne(deleteStore, item.id)));
+
+  const tx = db.transaction('nutrition_items', 'readwrite');
+  const itemStore = tx.objectStore('nutrition_items');
+  for (const item of items) {
+    itemStore.add({
+      plan_id: planId,
+      meal: item.meal || '每日固定',
+      food_name: item.food_name,
+      amount: item.amount,
+      unit: item.unit,
+      note: item.note,
+      sort_order: item.sort_order,
+    });
+  }
+  await transactionDone(tx);
+
+  const saved = await readNutritionPlan();
+  if (!saved) throw new Error('膳食计划保存失败');
+  return saved;
 }
 
 const browserDB = {
@@ -308,22 +410,105 @@ const browserDB = {
     return all.sort((a, b) => new Date(b.changed_at).getTime() - new Date(a.changed_at).getTime());
   },
 
+  async getWeightLogs(): Promise<WeightLog[]> {
+    const db = await openDB();
+    const logs = await getAll<WeightLog>(store(db, 'weight_logs'));
+    return logs.sort((a, b) => a.date.localeCompare(b.date) || a.id - b.id);
+  },
+
+  async saveWeightLog(input: WeightLogInput): Promise<WeightLog> {
+    const db = await openDB();
+    const now = new Date().toISOString();
+    let existing: WeightLog | undefined;
+
+    if (input.id) {
+      existing = await request<WeightLog | undefined>(
+        store(db, 'weight_logs').get(input.id) as IDBRequest<WeightLog | undefined>
+      );
+    } else {
+      const matches = await getByIndex<WeightLog>(store(db, 'weight_logs'), 'date', input.date);
+      existing = matches[0];
+    }
+
+    const record: WeightLog = {
+      id: existing?.id ?? 0,
+      date: input.date,
+      weight_kg: input.weight_kg,
+      note: input.note ?? '',
+      created_at: existing?.created_at ?? now,
+      updated_at: now,
+    };
+
+    if (existing) {
+      await putOne(store(db, 'weight_logs', 'readwrite'), record);
+      return record;
+    }
+
+    const id = await request(store(db, 'weight_logs', 'readwrite').add({
+      date: record.date,
+      weight_kg: record.weight_kg,
+      note: record.note,
+      created_at: record.created_at,
+      updated_at: record.updated_at,
+    }));
+    return { ...record, id: Number(id) };
+  },
+
+  async deleteWeightLog(id: number): Promise<void> {
+    const db = await openDB();
+    await deleteOne(store(db, 'weight_logs', 'readwrite'), id);
+  },
+
+  async getNutritionPlan(): Promise<NutritionPlanWithItems | null> {
+    return readNutritionPlan();
+  },
+
+  async saveNutritionPlan(
+    plan: NutritionPlanInput,
+    items: NutritionItemInput[]
+  ): Promise<NutritionPlanWithItems> {
+    return writeNutritionPlan(plan, items);
+  },
+
+  async ensureNutritionTemplate(): Promise<NutritionPlanWithItems> {
+    const existing = await readNutritionPlan();
+    if (existing) return existing;
+    return writeNutritionPlan(
+      {
+        name: nutritionTemplate.name,
+        start_date: formatDate(new Date()),
+        calories: nutritionTemplate.calories,
+        protein: nutritionTemplate.protein,
+        carbs: nutritionTemplate.carbs,
+        fat: nutritionTemplate.fat,
+        note: nutritionTemplate.note,
+      },
+      nutritionTemplate.items
+    );
+  },
+
   async exportAll(): Promise<BackupData> {
     const db = await openDB();
-    const [configs, sessions, set_logs, weight_changes] = await Promise.all([
+    const [configs, sessions, set_logs, weight_changes, weight_logs, nutrition_plans, nutrition_items] = await Promise.all([
       getAll<ExerciseConfig>(store(db, 'exercise_configs')),
       getAll<WorkoutSession>(store(db, 'workout_sessions')),
       getAll<SetLog>(store(db, 'set_logs')),
       getAll<WeightChange>(store(db, 'weight_changes')),
+      getAll<WeightLog>(store(db, 'weight_logs')),
+      getAll<NutritionPlan>(store(db, 'nutrition_plans')),
+      getAll<NutritionItem>(store(db, 'nutrition_items')),
     ]);
     return {
       app: 'myworkout',
-      version: 1,
+      version: 2,
       exported_at: new Date().toISOString(),
       configs,
       sessions,
       set_logs,
       weight_changes,
+      weight_logs,
+      nutrition_plans,
+      nutrition_items,
     };
   },
 
@@ -344,6 +529,9 @@ const browserDB = {
     for (const session of data.sessions) tx.objectStore('workout_sessions').put(session);
     for (const log of data.set_logs) tx.objectStore('set_logs').put(log);
     for (const change of data.weight_changes) tx.objectStore('weight_changes').put(change);
+    for (const weight of data.weight_logs ?? []) tx.objectStore('weight_logs').put(weight);
+    for (const plan of data.nutrition_plans ?? []) tx.objectStore('nutrition_plans').put(plan);
+    for (const item of data.nutrition_items ?? []) tx.objectStore('nutrition_items').put(item);
     await transactionDone(tx);
   },
 };

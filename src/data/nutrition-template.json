@@ -1,0 +1,50 @@
+{
+  "name": "减脂阶段 01",
+  "calories": 2100,
+  "protein": 180,
+  "carbs": 220,
+  "fat": 56,
+  "note": "38 岁男性 · 170 cm · 每周力量训练 4 次 · 久坐办公。初始模板按 90 kg / 2,100 kcal 设定；实际摄入会因食材和烹饪方式略有差异。",
+  "items": [
+    {
+      "meal": "每日固定",
+      "food_name": "鸡胸肉",
+      "amount": "600",
+      "unit": "g",
+      "note": "生重",
+      "sort_order": 1
+    },
+    {
+      "meal": "每日固定",
+      "food_name": "鸡蛋",
+      "amount": "3",
+      "unit": "个",
+      "note": "去壳约 150 g",
+      "sort_order": 2
+    },
+    {
+      "meal": "每日固定",
+      "food_name": "螺纹辣椒",
+      "amount": "200",
+      "unit": "g",
+      "note": "清洗去蒂后生重",
+      "sort_order": 3
+    },
+    {
+      "meal": "每日固定",
+      "food_name": "白米",
+      "amount": "270",
+      "unit": "g",
+      "note": "生米重，煮熟约 675–810 g",
+      "sort_order": 4
+    },
+    {
+      "meal": "每日固定",
+      "food_name": "食用油",
+      "amount": "32",
+      "unit": "g",
+      "note": "实际用量",
+      "sort_order": 5
+    }
+  ]
+}

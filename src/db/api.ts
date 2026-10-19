@@ -2,8 +2,13 @@ import type {
   BackupData,
   ExerciseConfig,
   NewExerciseInput,
+  NutritionItemInput,
+  NutritionPlanInput,
+  NutritionPlanWithItems,
   SetLog,
   WeightChange,
+  WeightLog,
+  WeightLogInput,
   WorkoutSession,
 } from '../types';
 import browserDB from './browser-db';
@@ -139,4 +144,41 @@ export async function exportAll(): Promise<BackupData> {
 export async function importAll(data: BackupData): Promise<void> {
   if (isElectron) return invoke<void>('db:importAll', data);
   return browserDB.importAll(data);
+}
+
+// ========== 体重记录 ==========
+
+export async function getWeightLogs(): Promise<WeightLog[]> {
+  if (isElectron) return invoke<WeightLog[]>('db:getWeightLogs');
+  return browserDB.getWeightLogs();
+}
+
+export async function saveWeightLog(input: WeightLogInput): Promise<WeightLog> {
+  if (isElectron) return invoke<WeightLog>('db:saveWeightLog', input);
+  return browserDB.saveWeightLog(input);
+}
+
+export async function deleteWeightLog(id: number): Promise<void> {
+  if (isElectron) return invoke<void>('db:deleteWeightLog', id);
+  return browserDB.deleteWeightLog(id);
+}
+
+// ========== 膳食计划 ==========
+
+export async function getNutritionPlan(): Promise<NutritionPlanWithItems | null> {
+  if (isElectron) return invoke<NutritionPlanWithItems | null>('db:getNutritionPlan');
+  return browserDB.getNutritionPlan();
+}
+
+export async function saveNutritionPlan(
+  plan: NutritionPlanInput,
+  items: NutritionItemInput[]
+): Promise<NutritionPlanWithItems> {
+  if (isElectron) return invoke<NutritionPlanWithItems>('db:saveNutritionPlan', plan, items);
+  return browserDB.saveNutritionPlan(plan, items);
+}
+
+export async function ensureNutritionTemplate(): Promise<NutritionPlanWithItems> {
+  if (isElectron) return invoke<NutritionPlanWithItems>('db:ensureNutritionTemplate');
+  return browserDB.ensureNutritionTemplate();
 }

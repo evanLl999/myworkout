@@ -48,7 +48,7 @@ export default function BackupPanel() {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
-    if (!confirm('导入备份会覆盖当前手机上的所有训练计划和打卡记录，确定继续吗？')) return;
+    if (!confirm('导入备份会覆盖当前手机上的所有训练计划、体重和膳食记录，确定继续吗？')) return;
 
     setBusy(true);
     setError('');

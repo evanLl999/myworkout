@@ -4,7 +4,7 @@
 
 | 运行方式 | 实现 | 位置 |
 |---|---|---|
-| 手机 PWA / 浏览器 | IndexedDB | 数据库 `myworkout`，4 个 object store |
+| 手机 PWA / 浏览器 | IndexedDB | 数据库 `myworkout`，DB_VERSION 2，7 个 object store |
 | Electron | sql.js + SQLite | `userData/myworkout.db` |
 
 两套存储结构保持一致，字段名使用 snake_case。
@@ -67,6 +67,49 @@
 | new_weight | number | 变更后 |
 | changed_at | string | 变更时间 |
 
+## 5. weight_logs — 体重记录
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| id | number | 主键 |
+| date | string | `YYYY-MM-DD`，唯一（一天一条） |
+| weight_kg | number | 体重 kg |
+| note | string | 备注，如「早晨空腹」 |
+| created_at | string | 创建时间 |
+| updated_at | string | 更新时间 |
+
+同一天再次保存会覆盖原记录。趋势评估使用最近 28 天的线性回归斜率 × 7，
+按每周下降 0.25–0.75 kg 为「良好」。
+
+## 6. nutrition_plans — 膳食阶段
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| id | number | 主键 |
+| name | string | 阶段名，如「减脂阶段 01」 |
+| start_date | string | 阶段开始日期 |
+| calories | number | 每日目标热量 |
+| protein | number | 蛋白质 g |
+| carbs | number | 碳水 g |
+| fat | number | 脂肪 g |
+| note | string | 阶段说明/身体数据 |
+| is_active | 0 / 1 | 当前阶段 |
+| created_at | string | 创建时间 |
+| updated_at | string | 更新时间 |
+
+## 7. nutrition_items — 每日食材
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| id | number | 主键 |
+| plan_id | number | 关联 nutrition_plans |
+| meal | string | 餐次，默认「每日固定」 |
+| food_name | string | 食材名 |
+| amount | string | 数量，保留原始输入 |
+| unit | string | g / 个 / ml / 份 |
+| note | string | 生重、去壳、熟重等称重方式 |
+| sort_order | number | 排序 |
+
 ## 备份格式
 
 导出文件是 JSON：
@@ -74,19 +117,24 @@
 ```json
 {
   "app": "myworkout",
-  "version": 1,
+  "version": 2,
   "exported_at": "2026-10-20T12:00:00.000Z",
   "configs": [],
   "sessions": [],
   "set_logs": [],
-  "weight_changes": []
+  "weight_changes": [],
+  "weight_logs": [],
+  "nutrition_plans": [],
+  "nutrition_items": []
 }
 ```
 
-导入采用整库覆盖，保留记录的 `id`，并恢复归档状态。导入前必须二次确认。
+导入采用整库覆盖，保留记录的 `id`，并恢复归档状态。v1 旧备份没有体重/膳食数组时，
+对应数据会为空；导入前必须二次确认。
 
 ## 迁移规则
 
-- IndexedDB 是 schemaless，新增可选字段不需要升版本；删除或改主键才需要迁移。
+- IndexedDB 当前 DB_VERSION 为 2；从 v1 升级时新增 `weight_logs`、`nutrition_plans`、
+  `nutrition_items` 三个 store，旧数据不受影响。
 - SQLite 新增字段使用 `ALTER TABLE ... ADD COLUMN`，并包在 try/catch 中处理字段已存在。
 - 新增字段必须有默认值或允许为 null，保证旧数据库可以直接打开。

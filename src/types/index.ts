@@ -69,4 +69,73 @@ export interface BackupData {
   sessions: WorkoutSession[];
   set_logs: SetLog[];
   weight_changes: WeightChange[];
+  weight_logs?: WeightLog[];
+  nutrition_plans?: NutritionPlan[];
+  nutrition_items?: NutritionItem[];
+}
+
+export interface WeightLog {
+  id: number;
+  date: string;
+  weight_kg: number;
+  note: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WeightLogInput {
+  id?: number;
+  date: string;
+  weight_kg: number;
+  note: string;
+}
+
+export interface NutritionPlan {
+  id: number;
+  name: string;
+  start_date: string;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  note: string;
+  is_active: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface NutritionItem {
+  id: number;
+  plan_id: number;
+  meal: string;
+  food_name: string;
+  amount: string;
+  unit: string;
+  note: string;
+  sort_order: number;
+}
+
+export interface NutritionPlanWithItems extends NutritionPlan {
+  items: NutritionItem[];
+}
+
+export interface NutritionPlanInput {
+  id?: number;
+  name: string;
+  start_date: string;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  note: string;
+}
+
+export interface NutritionItemInput {
+  id?: number;
+  meal: string;
+  food_name: string;
+  amount: string;
+  unit: string;
+  note: string;
+  sort_order: number;
 }

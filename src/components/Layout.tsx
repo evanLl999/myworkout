@@ -1,10 +1,12 @@
 import { NavLink, Outlet } from 'react-router-dom';
 import ColorPickerBtn from './ColorPicker';
-import { DumbbellIcon, SlidersIcon } from './Icons';
+import { BowlIcon, DumbbellIcon, SlidersIcon, TrendIcon } from './Icons';
 
 const menuItems = [
-  { path: '/workout', label: '训练记录', icon: DumbbellIcon },
-  { path: '/profile', label: '我的计划', icon: SlidersIcon },
+  { path: '/workout', label: '训练', icon: DumbbellIcon },
+  { path: '/weight', label: '体重', icon: TrendIcon },
+  { path: '/nutrition', label: '饮食', icon: BowlIcon },
+  { path: '/profile', label: '计划', icon: SlidersIcon },
 ];
 
 export default function Layout() {

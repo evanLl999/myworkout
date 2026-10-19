@@ -1,6 +1,7 @@
 const path = require('path');
 const fs = require('fs');
 const { app } = require('electron');
+const nutritionTemplate = require('../src/data/nutrition-template.json');
 
 let db = null;
 let dbPath = null;
@@ -90,6 +91,47 @@ async function initDatabase() {
       new_weight REAL NOT NULL,
       changed_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
       FOREIGN KEY (exercise_config_id) REFERENCES exercise_configs(id)
+    )
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS weight_logs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      date TEXT NOT NULL UNIQUE,
+      weight_kg REAL NOT NULL,
+      note TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+    )
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS nutrition_plans (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      start_date TEXT NOT NULL,
+      calories REAL NOT NULL DEFAULT 0,
+      protein REAL NOT NULL DEFAULT 0,
+      carbs REAL NOT NULL DEFAULT 0,
+      fat REAL NOT NULL DEFAULT 0,
+      note TEXT NOT NULL DEFAULT '',
+      is_active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+    )
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS nutrition_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      plan_id INTEGER NOT NULL,
+      meal TEXT NOT NULL DEFAULT '每日固定',
+      food_name TEXT NOT NULL,
+      amount TEXT NOT NULL,
+      unit TEXT NOT NULL DEFAULT '',
+      note TEXT NOT NULL DEFAULT '',
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      FOREIGN KEY (plan_id) REFERENCES nutrition_plans(id) ON DELETE CASCADE
     )
   `);
 
@@ -295,17 +337,121 @@ function getWeightHistory(exerciseConfigId) {
   return queryAll('SELECT * FROM weight_changes WHERE exercise_config_id = ? ORDER BY changed_at DESC', [exerciseConfigId]);
 }
 
+// ========== 体重记录 ==========
+
+function getWeightLogs() {
+  return queryAll('SELECT * FROM weight_logs ORDER BY date, id');
+}
+
+function saveWeightLog({ id, date, weight_kg, note }) {
+  let existing = null;
+  if (id) {
+    existing = queryOne('SELECT * FROM weight_logs WHERE id = ?', [id]);
+  }
+  if (!existing) {
+    existing = queryOne('SELECT * FROM weight_logs WHERE date = ?', [date]);
+  }
+
+  if (existing) {
+    run(
+      "UPDATE weight_logs SET date = ?, weight_kg = ?, note = ?, updated_at = datetime('now', 'localtime') WHERE id = ?",
+      [date, weight_kg, note ?? '', existing.id]
+    );
+    return queryOne('SELECT * FROM weight_logs WHERE id = ?', [existing.id]);
+  }
+
+  const result = run(
+    'INSERT INTO weight_logs (date, weight_kg, note) VALUES (?, ?, ?)',
+    [date, weight_kg, note ?? '']
+  );
+  return queryOne('SELECT * FROM weight_logs WHERE id = ?', [result.lastInsertRowid]);
+}
+
+function deleteWeightLog(id) {
+  run('DELETE FROM weight_logs WHERE id = ?', [id]);
+}
+
+// ========== 膳食计划 ==========
+
+function getNutritionPlan() {
+  const plan = queryOne('SELECT * FROM nutrition_plans WHERE is_active = 1 ORDER BY id DESC LIMIT 1');
+  if (!plan) return null;
+  plan.items = queryAll(
+    'SELECT * FROM nutrition_items WHERE plan_id = ? ORDER BY sort_order, id',
+    [plan.id]
+  );
+  return plan;
+}
+
+function saveNutritionPlan(plan, items) {
+  let planId = plan.id || null;
+  const existing = planId ? queryOne('SELECT * FROM nutrition_plans WHERE id = ?', [planId]) : null;
+
+  if (!existing) planId = null;
+
+  if (planId) {
+    run(
+      `UPDATE nutrition_plans
+       SET name = ?, start_date = ?, calories = ?, protein = ?, carbs = ?, fat = ?, note = ?,
+           is_active = 1, updated_at = datetime('now', 'localtime')
+       WHERE id = ?`,
+      [plan.name, plan.start_date, plan.calories, plan.protein, plan.carbs, plan.fat, plan.note ?? '', planId]
+    );
+  } else {
+    const result = run(
+      `INSERT INTO nutrition_plans
+         (name, start_date, calories, protein, carbs, fat, note, is_active)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 1)`,
+      [plan.name, plan.start_date, plan.calories, plan.protein, plan.carbs, plan.fat, plan.note ?? '']
+    );
+    planId = result.lastInsertRowid;
+  }
+
+  run('UPDATE nutrition_plans SET is_active = 0 WHERE id <> ?', [planId]);
+  run('DELETE FROM nutrition_items WHERE plan_id = ?', [planId]);
+  for (const item of items) {
+    run(
+      `INSERT INTO nutrition_items (plan_id, meal, food_name, amount, unit, note, sort_order)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [planId, item.meal || '每日固定', item.food_name, item.amount, item.unit ?? '', item.note ?? '', item.sort_order ?? 0]
+    );
+  }
+  return getNutritionPlan();
+}
+
+function ensureNutritionTemplate() {
+  const existing = getNutritionPlan();
+  if (existing) return existing;
+  const d = new Date();
+  const startDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  return saveNutritionPlan(
+    {
+      name: nutritionTemplate.name,
+      start_date: startDate,
+      calories: nutritionTemplate.calories,
+      protein: nutritionTemplate.protein,
+      carbs: nutritionTemplate.carbs,
+      fat: nutritionTemplate.fat,
+      note: nutritionTemplate.note,
+    },
+    nutritionTemplate.items
+  );
+}
+
 // ========== 备份与恢复 ==========
 
 function exportAll() {
   return {
     app: 'myworkout',
-    version: 1,
+    version: 2,
     exported_at: new Date().toISOString(),
     configs: queryAll('SELECT * FROM exercise_configs ORDER BY id'),
     sessions: queryAll('SELECT * FROM workout_sessions ORDER BY id'),
     set_logs: queryAll('SELECT * FROM set_logs ORDER BY id'),
     weight_changes: queryAll('SELECT * FROM weight_changes ORDER BY id'),
+    weight_logs: queryAll('SELECT * FROM weight_logs ORDER BY id'),
+    nutrition_plans: queryAll('SELECT * FROM nutrition_plans ORDER BY id'),
+    nutrition_items: queryAll('SELECT * FROM nutrition_items ORDER BY id'),
   };
 }
 
@@ -324,8 +470,11 @@ function importAll(payload) {
   db.run('BEGIN');
   try {
     db.run('DELETE FROM set_logs');
+    db.run('DELETE FROM nutrition_items');
     db.run('DELETE FROM weight_changes');
+    db.run('DELETE FROM weight_logs');
     db.run('DELETE FROM workout_sessions');
+    db.run('DELETE FROM nutrition_plans');
     db.run('DELETE FROM exercise_configs');
 
     for (const c of payload.configs) {
@@ -372,6 +521,38 @@ function importAll(payload) {
       );
     }
 
+    for (const weight of payload.weight_logs ?? []) {
+      db.run(
+        `INSERT INTO weight_logs (id, date, weight_kg, note, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [weight.id, weight.date, weight.weight_kg, weight.note ?? '', weight.created_at ?? now, weight.updated_at ?? now]
+      );
+    }
+
+    for (const plan of payload.nutrition_plans ?? []) {
+      db.run(
+        `INSERT INTO nutrition_plans
+           (id, name, start_date, calories, protein, carbs, fat, note, is_active, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          plan.id, plan.name, plan.start_date, plan.calories ?? 0, plan.protein ?? 0,
+          plan.carbs ?? 0, plan.fat ?? 0, plan.note ?? '', plan.is_active ?? 1,
+          plan.created_at ?? now, plan.updated_at ?? now,
+        ]
+      );
+    }
+
+    for (const item of payload.nutrition_items ?? []) {
+      db.run(
+        `INSERT INTO nutrition_items (id, plan_id, meal, food_name, amount, unit, note, sort_order)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          item.id, item.plan_id, item.meal ?? '每日固定', item.food_name, item.amount,
+          item.unit ?? '', item.note ?? '', item.sort_order ?? 0,
+        ]
+      );
+    }
+
     db.run('COMMIT');
   } catch (err) {
     try { db.run('ROLLBACK'); } catch (_) {}
@@ -399,6 +580,12 @@ module.exports = {
   getCompletedSetCount,
   updateWeight,
   getWeightHistory,
+  getWeightLogs,
+  saveWeightLog,
+  deleteWeightLog,
+  getNutritionPlan,
+  saveNutritionPlan,
+  ensureNutritionTemplate,
   exportAll,
   importAll,
 };

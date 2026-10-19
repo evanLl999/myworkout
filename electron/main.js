@@ -104,6 +104,30 @@ function registerIpcHandlers() {
     return db.getWeightHistory(exerciseConfigId);
   }));
 
+  ipcMain.handle('db:getWeightLogs', safeHandler(() => {
+    return db.getWeightLogs();
+  }));
+
+  ipcMain.handle('db:saveWeightLog', safeHandler((_event, input) => {
+    return db.saveWeightLog(input);
+  }));
+
+  ipcMain.handle('db:deleteWeightLog', safeHandler((_event, id) => {
+    return db.deleteWeightLog(id);
+  }));
+
+  ipcMain.handle('db:getNutritionPlan', safeHandler(() => {
+    return db.getNutritionPlan();
+  }));
+
+  ipcMain.handle('db:saveNutritionPlan', safeHandler((_event, plan, items) => {
+    return db.saveNutritionPlan(plan, items);
+  }));
+
+  ipcMain.handle('db:ensureNutritionTemplate', safeHandler(() => {
+    return db.ensureNutritionTemplate();
+  }));
+
   ipcMain.handle('db:exportAll', safeHandler(() => {
     return db.exportAll();
   }));
