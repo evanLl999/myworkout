@@ -276,6 +276,7 @@ const browserDB = {
       completed_at: null,
       training_started_at: null,
       training_ended_at: null,
+      plan_day_of_week: null,
     };
     const id = await request(store(db, 'workout_sessions', 'readwrite').add(record));
     return { id: Number(id), ...record };
@@ -342,6 +343,20 @@ const browserDB = {
       completed_at: null,
       training_started_at: null,
       training_ended_at: null,
+    };
+    await putOne(store(db, 'workout_sessions', 'readwrite'), updated);
+    return updated;
+  },
+
+  async setSessionPlanDay(sessionId: number, planDay: number | null): Promise<WorkoutSession | null> {
+    const db = await openDB();
+    const existing = await request<WorkoutSession | undefined>(
+      store(db, 'workout_sessions').get(sessionId) as IDBRequest<WorkoutSession | undefined>
+    );
+    if (!existing) return null;
+    const updated: WorkoutSession = {
+      ...existing,
+      plan_day_of_week: planDay,
     };
     await putOne(store(db, 'workout_sessions', 'readwrite'), updated);
     return updated;

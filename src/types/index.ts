@@ -35,6 +35,7 @@ export interface WorkoutSession {
   completed_at: string | null;
   training_started_at: string | null;
   training_ended_at: string | null;
+  plan_day_of_week?: number | null;
 }
 
 // 单组打卡记录

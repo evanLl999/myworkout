@@ -9,7 +9,8 @@ import ExerciseTracker from '../components/ExerciseTracker';
 import RestTimer from '../components/RestTimer';
 import Fireworks from '../components/Fireworks';
 import SessionHero from '../components/SessionHero';
-import { CalendarIcon, DumbbellIcon, SparkleIcon } from '../components/Icons';
+import PlanPicker from '../components/PlanPicker';
+import { CalendarIcon, DumbbellIcon, SparkleIcon, SwapIcon } from '../components/Icons';
 import {
   diffSeconds,
   formatDate,
@@ -26,11 +27,15 @@ function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : '操作失败，请稍后重试';
 }
 
+const PLAN_DAY_NAMES = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+
 export default function WorkoutLog() {
   const today = formatDate(new Date());
   const [weekStart, setWeekStart] = useState(() => getMonday(new Date()));
   const [selectedDate, setSelectedDate] = useState(today);
   const [showCalendar, setShowCalendar] = useState(false);
+  const [showPlanPicker, setShowPlanPicker] = useState(false);
+  const [allConfigs, setAllConfigs] = useState<ExerciseConfig[]>([]);
 
   const [exercises, setExercises] = useState<ExerciseConfig[]>([]);
   const [session, setSession] = useState<WorkoutSession | null>(null);
@@ -42,6 +47,9 @@ export default function WorkoutLog() {
 
   const isToday = selectedDate === today;
   const isFutureDate = selectedDate > today;
+  const calendarDay = (parseDate(selectedDate).getDay() + 6) % 7;
+  const effectivePlanDay = session?.plan_day_of_week ?? calendarDay;
+  const isMakeup = effectivePlanDay !== calendarDay;
   const activeExercises = exercises.filter((ex) => !ex.is_archived);
   const isPastEmpty = selectedDate < today && setLogs.length === 0 && !loading;
   const isFutureEmpty = isFutureDate && !loading;
@@ -71,17 +79,17 @@ export default function WorkoutLog() {
     const seq = ++loadSeq.current;
     setLoading(true);
     setError('');
-    const dow = parseDate(date).getDay();
-    const dayOfWeek = dow === 0 ? 6 : dow - 1;
+    const calendarDayForDate = (parseDate(date).getDay() + 6) % 7;
 
     try {
-      const [configs, existingSession] = await Promise.all([
-        api.getConfigsByDay(dayOfWeek, true),
-        api.getSessionByDate(date),
-      ]);
+      const existingSession = await api.getSessionByDate(date);
       if (seq !== loadSeq.current) return;
 
       const sess = existingSession || (date === formatDate(new Date()) ? await api.getOrCreateSession(date) : null);
+      if (seq !== loadSeq.current) return;
+
+      const planDay = sess?.plan_day_of_week ?? calendarDayForDate;
+      const configs = await api.getConfigsByDay(planDay, true);
       if (seq !== loadSeq.current) return;
 
       const logs = sess ? await api.getSetLogs(sess.id) : [];
@@ -211,6 +219,40 @@ export default function WorkoutLog() {
     setSelectedDate(date);
   }
 
+  async function openPlanPicker() {
+    if (!session) {
+      setError('当天训练还没有准备好，请刷新后再试');
+      return;
+    }
+    if (hasTrainingStarted || setLogs.length > 0) {
+      alert('已经开始训练或已有打卡，请先重置当天记录再换计划。');
+      return;
+    }
+    try {
+      setAllConfigs(await api.getAllConfigs());
+      setShowPlanPicker(true);
+    } catch (err) {
+      setError(errorMessage(err));
+    }
+  }
+
+  async function handleSelectPlanDay(planDay: number | null) {
+    if (!session) return;
+    if (hasTrainingStarted || setLogs.length > 0) {
+      setShowPlanPicker(false);
+      alert('已经开始训练或已有打卡，请先重置当天记录再换计划。');
+      return;
+    }
+    try {
+      const updated = await api.setSessionPlanDay(session.id, planDay);
+      setSession(updated);
+      setShowPlanPicker(false);
+      await loadDay(selectedDate);
+    } catch (err) {
+      setError(errorMessage(err));
+    }
+  }
+
   const planDuration = (session?.training_started_at && lastSetTime)
     ? diffSeconds(session.training_started_at, lastSetTime)
     : 0;
@@ -227,7 +269,25 @@ export default function WorkoutLog() {
           <span className="eyebrow">TRAINING LOG</span>
           <h1 className="page-title">健身记录</h1>
         </div>
-        <span className="page-date">{monthDayCN(selectedDate)} · {weekdayCN(selectedDate)}</span>
+        <div className="page-head-side">
+          <span className="page-date">{monthDayCN(selectedDate)} · {weekdayCN(selectedDate)}</span>
+          <div className="page-head-actions">
+            {isMakeup && (
+              <span className="makeup-chip">补练 {PLAN_DAY_NAMES[effectivePlanDay]}</span>
+            )}
+            {isToday && !hasTrainingStarted && (
+              <button
+                type="button"
+                className="plan-switch-btn"
+                onClick={openPlanPicker}
+                disabled={!session}
+              >
+                <SwapIcon />
+                {isMakeup ? '换计划' : '补练'}
+              </button>
+            )}
+          </div>
+        </div>
       </header>
 
       <section className="week-card">
@@ -274,8 +334,13 @@ export default function WorkoutLog() {
           <span className="empty-icon"><DumbbellIcon /></span>
           <span className="eyebrow">REST DAY</span>
           <h2 className="empty-title">今天还没有安排</h2>
-          <p className="empty-copy">去「我的计划」添加动作，回来开始今天的训练。</p>
-          <Link className="btn btn-primary" to="/profile">去安排计划</Link>
+          <p className="empty-copy">可以补练本周其他训练日，或者去计划页添加动作。</p>
+          <div className="empty-actions">
+            <button type="button" className="btn btn-primary" onClick={openPlanPicker}>
+              补练其他日
+            </button>
+            <Link className="btn btn-outline" to="/profile">去安排计划</Link>
+          </div>
         </div>
       )}
 
@@ -353,6 +418,16 @@ export default function WorkoutLog() {
           selectedDate={selectedDate}
           onSelect={handleCalendarSelect}
           onClose={() => setShowCalendar(false)}
+        />
+      )}
+
+      {showPlanPicker && session && (
+        <PlanPicker
+          calendarDay={calendarDay}
+          selectedDay={effectivePlanDay}
+          configs={allConfigs}
+          onSelect={handleSelectPlanDay}
+          onClose={() => setShowPlanPicker(false)}
         />
       )}
 

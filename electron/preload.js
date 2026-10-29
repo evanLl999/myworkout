@@ -15,6 +15,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
       'db:startTraining',
       'db:endTraining',
       'db:resetSession',
+      'db:setSessionPlanDay',
       'db:addSetLog',
       'db:getSetLogs',
       'db:getCompletedSetCount',

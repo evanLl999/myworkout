@@ -58,6 +58,9 @@ npm run check      # 类型检查 + 生产构建
 初始膳食模板在 `src/data/nutrition-template.json`，浏览器和 Electron 共用。
 体重评估使用最近 28 天的线性回归斜率 × 7，每周下降 0.25–0.75 kg 为「良好」。
 
+补练通过 `workout_sessions.plan_day_of_week` 实现：只改变某个日期的动作来源，
+不要修改 `exercise_configs.day_of_week`，否则会改掉后续每周的计划。
+
 ## 标准文档
 
 | 文件 | 用途 |

@@ -58,7 +58,8 @@ async function initDatabase() {
       started_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
       completed_at TEXT,
       training_started_at TEXT,
-      training_ended_at TEXT
+      training_ended_at TEXT,
+      plan_day_of_week INTEGER
     )
   `);
 
@@ -150,6 +151,7 @@ function migrateWorkoutSessions() {
   // 用 try-catch 处理字段已存在的情况
   try { db.run("ALTER TABLE workout_sessions ADD COLUMN training_started_at TEXT"); } catch (_) {}
   try { db.run("ALTER TABLE workout_sessions ADD COLUMN training_ended_at TEXT"); } catch (_) {}
+  try { db.run("ALTER TABLE workout_sessions ADD COLUMN plan_day_of_week INTEGER"); } catch (_) {}
   saveDb();
 }
 
@@ -286,6 +288,11 @@ function endTraining(sessionId) {
 function resetSession(sessionId) {
   run('DELETE FROM set_logs WHERE session_id = ?', [sessionId]);
   run("UPDATE workout_sessions SET completed_at = NULL, training_started_at = NULL, training_ended_at = NULL WHERE id = ?", [sessionId]);
+  return queryOne('SELECT * FROM workout_sessions WHERE id = ?', [sessionId]);
+}
+
+function setSessionPlanDay(sessionId, planDay) {
+  run('UPDATE workout_sessions SET plan_day_of_week = ? WHERE id = ?', [planDay, sessionId]);
   return queryOne('SELECT * FROM workout_sessions WHERE id = ?', [sessionId]);
 }
 
@@ -545,9 +552,12 @@ function importAll(payload) {
     for (const s of payload.sessions) {
       db.run(
         `INSERT INTO workout_sessions
-           (id, date, started_at, completed_at, training_started_at, training_ended_at)
-         VALUES (?, ?, ?, ?, ?, ?)`,
-        [s.id, s.date, s.started_at ?? now, s.completed_at ?? null, s.training_started_at ?? null, s.training_ended_at ?? null]
+           (id, date, started_at, completed_at, training_started_at, training_ended_at, plan_day_of_week)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [
+          s.id, s.date, s.started_at ?? now, s.completed_at ?? null,
+          s.training_started_at ?? null, s.training_ended_at ?? null, s.plan_day_of_week ?? null,
+        ]
       );
     }
 
@@ -633,6 +643,7 @@ module.exports = {
   startTraining,
   endTraining,
   resetSession,
+  setSessionPlanDay,
   addSetLog,
   getSetLogs,
   getCompletedSetCount,

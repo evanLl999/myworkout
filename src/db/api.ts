@@ -79,6 +79,14 @@ export async function resetSession(sessionId: number): Promise<WorkoutSession | 
   return browserDB.resetSession(sessionId) as Promise<WorkoutSession | null>;
 }
 
+export async function setSessionPlanDay(
+  sessionId: number,
+  planDay: number | null
+): Promise<WorkoutSession | null> {
+  if (isElectron) return invoke<WorkoutSession>('db:setSessionPlanDay', sessionId, planDay);
+  return browserDB.setSessionPlanDay(sessionId, planDay);
+}
+
 // ========== 打卡记录 ==========
 
 export async function addSetLog(

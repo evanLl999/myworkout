@@ -202,3 +202,11 @@ export function HistoryIcon(props: IconProps) {
     </svg>
   );
 }
+
+export function SwapIcon(props: IconProps) {
+  return (
+    <svg {...iconProps(props)}>
+      <path d="M4 7h13M14 4l3 3-3 3M20 17H7M10 14l-3 3 3 3" />
+    </svg>
+  );
+}

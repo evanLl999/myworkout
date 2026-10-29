@@ -39,6 +39,9 @@
 | completed_at | string / null | 必练全部完成时间 |
 | training_started_at | string / null | 点击「开始训练」或首次打卡时间 |
 | training_ended_at | string / null | 点击「结束训练」时间 |
+| plan_day_of_week | number / null | 补练使用的计划日；null 表示按当前日期的星期 |
+
+补练设置只作用于这一条日期 session，不修改 `exercise_configs.day_of_week`。
 
 ## 3. set_logs — 每组打卡
 

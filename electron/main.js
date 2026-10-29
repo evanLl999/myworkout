@@ -84,6 +84,10 @@ function registerIpcHandlers() {
     return db.resetSession(sessionId);
   }));
 
+  ipcMain.handle('db:setSessionPlanDay', safeHandler((_event, sessionId, planDay) => {
+    return db.setSessionPlanDay(sessionId, planDay);
+  }));
+
   ipcMain.handle('db:addSetLog', safeHandler((_event, sessionId, exerciseConfigId, setNumber, weightUsed, repsDone, exerciseName, muscleGroup) => {
     return db.addSetLog(sessionId, exerciseConfigId, setNumber, weightUsed, repsDone, exerciseName, muscleGroup);
   }));
